@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sai-blue: #2563B0;
+  --sai-navy: #0B1120;
+}
+
+html, body, #root { height: 100%; }
+body {
+  font-family: 'Open Sans', system-ui, sans-serif;
+  color: #111827;
+  background: #f7f7f7;
+}
+
+/* ── Odoo-style chevron status bar ── */
+.chevron-bar {
+  display: inline-flex;
+  align-items: stretch;
+  background: white;
+  border: 1px solid #e2e4ea;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.chevron {
+  position: relative;
+  padding: 6px 22px 6px 26px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+  background: white;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  border-right: 1px solid #e2e4ea;
+}
+.chevron:first-child { padding-left: 14px; }
+.chevron:last-child { border-right: 0; }
+.chevron:hover { background: #f3f6fb; color: #111827; }
+.chevron.is-active {
+  background: var(--sai-blue);
+  color: white;
+}
+.chevron.is-active:hover { background: var(--sai-blue); color: white; }
+
+/* ── Odoo-style form field ── */
+.field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sai-blue);
+  letter-spacing: 0.01em;
+  margin-bottom: 2px;
+}
+.field-value {
+  font-size: 13px;
+  color: #111827;
+  border-bottom: 1px dotted #d1d5db;
+  padding: 4px 0;
+  background: transparent;
+  outline: none;
+  width: 100%;
+}
+.field-value:focus { border-bottom-color: var(--sai-blue); }
+.field-value[readonly] { border-bottom-style: solid; border-bottom-color: transparent; }
+
+/* ── Line item compact input ── */
+.line-input {
+  width: 100%;
+  font-size: 11px;
+  padding: 2px 4px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: #111827;
+  outline: none;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.line-input:hover { border-color: #e2e4ea; }
+.line-input:focus { border-color: var(--sai-blue); background: white; }
+select.line-input { appearance: none; padding-right: 14px; background-position: right 2px center; background-repeat: no-repeat; background-size: 10px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M3 4l3 3 3-3z'/%3E%3C/svg%3E"); }
+
+/* ── Kanban card ── */
+.kanban-card {
+  background: white;
+  border: 1px solid #e2e4ea;
+  border-radius: 6px;
+  padding: 10px 12px;
+  box-shadow: 0 1px 2px rgba(11,17,32,0.06);
+  transition: box-shadow 0.15s;
+  cursor: pointer;
+}
+.kanban-card:hover { box-shadow: 0 4px 10px rgba(11,17,32,0.1); }
+
+/* ── Stars ── */
+.star-row { display: inline-flex; gap: 2px; }
+.star { font-size: 13px; color: #d1d5db; }
+.star.is-on { color: #f59e0b; }
+
+/* ── Ribbon (won) ── */
+.ribbon {
+  position: absolute;
+  top: 10px; right: -22px;
+  transform: rotate(40deg);
+  background: #10b981;
+  color: white;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 2px 24px;
+  text-transform: uppercase;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+/* Scrollbars */
+.scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+.scroll-thin::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
