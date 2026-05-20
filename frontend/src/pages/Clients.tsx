@@ -61,7 +61,7 @@ export default function Clients() {
   return (
     <div className="min-h-[calc(100vh-44px)]">
       {/* Sub-toolbar */}
-      <div className="bg-white border-b border-odoo-border px-4 py-2 flex items-center gap-3">
+      <div className="bg-white border-b border-ui-border px-4 py-2 flex items-center gap-3">
         <Link to="/" className="text-[12px] text-slate-500 hover:text-sai-navy">← Apps</Link>
         <div className="text-slate-300">/</div>
         <div className="text-[13px] font-semibold text-sai-navy font-display">Clients</div>
@@ -70,7 +70,7 @@ export default function Clients() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search name, industry, contact, location…"
-          className="text-[12px] border border-odoo-border rounded px-2 py-1.5 w-72 outline-none focus:border-sai-blue"
+          className="text-[12px] border border-ui-border rounded px-2 py-1.5 w-72 outline-none focus:border-sai-blue"
         />
         <button
           onClick={() =>
@@ -84,9 +84,9 @@ export default function Clients() {
 
       {/* List view */}
       <div className="px-4 py-4">
-        <div className="bg-white border border-odoo-border rounded-md overflow-hidden shadow-card">
+        <div className="bg-white border border-ui-border rounded-md overflow-hidden shadow-card">
           <table className="w-full text-[13px]">
-            <thead className="bg-slate-50 border-b border-odoo-border">
+            <thead className="bg-slate-50 border-b border-ui-border">
               <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500">
                 <th className="px-3 py-2 font-semibold">Client</th>
                 <th className="px-3 py-2 font-semibold">Industry</th>
@@ -103,7 +103,7 @@ export default function Clients() {
                 <tr
                   key={c.id}
                   onClick={() => setEditing({ ...c })}
-                  className="border-b border-odoo-border last:border-0 hover:bg-odoo-rowhover cursor-pointer"
+                  className="border-b border-ui-border last:border-0 hover:bg-ui-rowhover cursor-pointer"
                 >
                   <td className="px-3 py-2.5">
                     <div className="font-semibold text-sai-navy">{c.name}</div>
@@ -147,7 +147,7 @@ export default function Clients() {
             className="bg-white w-[460px] h-full shadow-2xl flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-5 py-3 border-b border-odoo-border flex items-center">
+            <div className="px-5 py-3 border-b border-ui-border flex items-center">
               <div className="text-[14px] font-display font-bold text-sai-navy">
                 {editing.id ? "Edit Client" : "New Client"}
               </div>
@@ -168,7 +168,7 @@ export default function Clients() {
               <DField label="Site Location" value={editing.site_location ?? ""} onChange={(v) => setEditing({ ...editing, site_location: v })} />
 
               {editing.id && (
-                <div className="pt-4 border-t border-odoo-border">
+                <div className="pt-4 border-t border-ui-border">
                   <div className="field-label">Related Opportunities</div>
                   <div className="mt-1 space-y-1">
                     {opps
@@ -177,7 +177,7 @@ export default function Clients() {
                         <Link
                           key={o.id}
                           to={`/proposals/${o.id}`}
-                          className="block text-[12px] px-2 py-1.5 rounded hover:bg-odoo-rowhover border border-odoo-border"
+                          className="block text-[12px] px-2 py-1.5 rounded hover:bg-ui-rowhover border border-ui-border"
                         >
                           <div className="font-semibold text-sai-navy">{o.title}</div>
                           <div className="text-[11px] text-slate-500">
@@ -193,7 +193,7 @@ export default function Clients() {
                 </div>
               )}
             </div>
-            <div className="px-5 py-3 border-t border-odoo-border flex justify-end gap-2">
+            <div className="px-5 py-3 border-t border-ui-border flex justify-end gap-2">
               <button
                 onClick={() => setEditing(null)}
                 className="text-[12px] px-3 py-1.5 text-slate-500 hover:text-slate-800"

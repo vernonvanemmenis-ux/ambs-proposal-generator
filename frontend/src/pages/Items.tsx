@@ -78,7 +78,7 @@ export default function Items() {
 
   return (
     <div className="min-h-[calc(100vh-44px)]">
-      <div className="bg-white border-b border-odoo-border px-4 py-2 flex items-center gap-3">
+      <div className="bg-white border-b border-ui-border px-4 py-2 flex items-center gap-3">
         <Link to="/" className="text-[12px] text-slate-500 hover:text-sai-navy">← Apps</Link>
         <div className="text-slate-300">/</div>
         <div className="text-[13px] font-semibold text-sai-navy font-display">Items Catalogue</div>
@@ -86,7 +86,7 @@ export default function Items() {
         <select
           value={cat}
           onChange={(e) => setCat(e.target.value)}
-          className="text-[12px] border border-odoo-border rounded px-2 py-1.5 outline-none focus:border-sai-blue"
+          className="text-[12px] border border-ui-border rounded px-2 py-1.5 outline-none focus:border-sai-blue"
         >
           <option value="">All categories</option>
           {CATEGORIES.map((c) => (<option key={c} value={c}>{c}</option>))}
@@ -95,7 +95,7 @@ export default function Items() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search code, name, description…"
-          className="text-[12px] border border-odoo-border rounded px-2 py-1.5 w-72 outline-none focus:border-sai-blue"
+          className="text-[12px] border border-ui-border rounded px-2 py-1.5 w-72 outline-none focus:border-sai-blue"
         />
         <button
           onClick={() => setEditing({ category: "Component", unit_of_measure: "each", default_rate: 0 })}
@@ -106,9 +106,9 @@ export default function Items() {
       </div>
 
       <div className="px-4 py-4">
-        <div className="bg-white border border-odoo-border rounded-md overflow-hidden shadow-card">
+        <div className="bg-white border border-ui-border rounded-md overflow-hidden shadow-card">
           <table className="w-full text-[12px]">
-            <thead className="bg-slate-50 border-b border-odoo-border">
+            <thead className="bg-slate-50 border-b border-ui-border">
               <tr className="text-left text-[10px] uppercase tracking-wider text-slate-500">
                 <th className="px-3 py-2 font-semibold">Code</th>
                 <th className="px-3 py-2 font-semibold">Name</th>
@@ -121,7 +121,7 @@ export default function Items() {
             </thead>
             <tbody>
               {rows.map((i) => (
-                <tr key={i.id} className="border-b border-odoo-border last:border-0 hover:bg-odoo-rowhover">
+                <tr key={i.id} className="border-b border-ui-border last:border-0 hover:bg-ui-rowhover">
                   <td className="px-3 py-2 font-mono text-[11px] text-slate-600 cursor-pointer" onClick={() => setEditing({ ...i })}>
                     {i.code}
                   </td>
@@ -168,7 +168,7 @@ export default function Items() {
       {editing && (
         <div className="fixed inset-0 bg-black/30 z-50 flex justify-end" onClick={() => setEditing(null)}>
           <div className="bg-white w-[500px] h-full shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 py-3 border-b border-odoo-border flex items-center">
+            <div className="px-5 py-3 border-b border-ui-border flex items-center">
               <div className="text-[14px] font-display font-bold text-sai-navy">
                 {editing.id ? "Edit Item" : "New Item"}
               </div>
@@ -223,7 +223,7 @@ export default function Items() {
                 </select>
               </Field>
             </div>
-            <div className="px-5 py-3 border-t border-odoo-border flex justify-end gap-2">
+            <div className="px-5 py-3 border-t border-ui-border flex justify-end gap-2">
               <button onClick={() => setEditing(null)} className="text-[12px] px-3 py-1.5 text-slate-500 hover:text-slate-800">
                 Cancel
               </button>

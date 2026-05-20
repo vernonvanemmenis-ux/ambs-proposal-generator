@@ -30,7 +30,7 @@ class Opportunity(Base):
     expected_close: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    # Sales / quotation extras (Odoo-Sales-style)
+    # Sales / quotation extras
     valid_until: Mapped[date | None] = mapped_column(Date, nullable=True)
     salesperson: Mapped[str] = mapped_column(String(120), default="")
     deposit_pct: Mapped[float] = mapped_column(Float, default=0.0)
@@ -175,7 +175,7 @@ class Activity(Base):
 
 
 # ============================================================================
-# Construction projects (Odoo-style post-Won lifecycle)
+# Construction projects (post-Won lifecycle)
 # ============================================================================
 class Project(Base):
     """A construction project — created automatically when an Opportunity is Won."""

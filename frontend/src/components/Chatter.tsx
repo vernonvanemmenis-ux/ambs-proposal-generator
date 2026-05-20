@@ -30,8 +30,8 @@ export default function Chatter({ listActivities, postActivity, refreshKey }: Pr
   };
 
   return (
-    <div className="bg-white border border-odoo-border rounded-md">
-      <div className="px-4 py-2 border-b border-odoo-border flex gap-4 text-[11px] font-semibold uppercase tracking-wider">
+    <div className="bg-white border border-ui-border rounded-md">
+      <div className="px-4 py-2 border-b border-ui-border flex gap-4 text-[11px] font-semibold uppercase tracking-wider">
         {(["message", "note", "log"] as const).map((t) => (
           <button
             key={t}
@@ -52,7 +52,7 @@ export default function Chatter({ listActivities, postActivity, refreshKey }: Pr
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={tab === "message" ? "Write a message..." : "Log an internal note..."}
-            className="flex-1 text-[13px] border border-odoo-border rounded px-2 py-1.5 resize-y min-h-[60px] outline-none focus:border-sai-blue"
+            className="flex-1 text-[13px] border border-ui-border rounded px-2 py-1.5 resize-y min-h-[60px] outline-none focus:border-sai-blue"
           />
           <button
             onClick={send}

@@ -119,7 +119,7 @@ export default function TemplateEditor() {
 
   return (
     <div className="min-h-[calc(100vh-44px)]">
-      <div className="bg-white border-b border-odoo-border px-4 py-2 flex items-center gap-3">
+      <div className="bg-white border-b border-ui-border px-4 py-2 flex items-center gap-3">
         <Link to="/" className="text-[12px] text-slate-500 hover:text-sai-navy">Apps</Link>
         <div className="text-slate-300">/</div>
         <Link to="/templates" className="text-[12px] text-slate-500 hover:text-sai-navy">Templates</Link>
@@ -143,7 +143,7 @@ export default function TemplateEditor() {
 
       <div className="max-w-5xl mx-auto px-6 py-6 space-y-4">
         {/* Template meta + brand */}
-        <div className="bg-white border border-odoo-border rounded-md p-5 space-y-3">
+        <div className="bg-white border border-ui-border rounded-md p-5 space-y-3">
           <div className="font-display font-bold text-sai-navy">Template Details</div>
           <div className="grid grid-cols-2 gap-x-6 gap-y-3">
             <Field label="Name"><input className="field-value" value={tpl.name} onChange={(e) => patch({ name: e.target.value })} /></Field>
@@ -154,13 +154,13 @@ export default function TemplateEditor() {
             <Field label="Contact Line"><input className="field-value" value={tpl.brand_contact_line} onChange={(e) => patch({ brand_contact_line: e.target.value })} /></Field>
             <Field label="Primary Colour">
               <div className="flex items-center gap-2">
-                <input type="color" value={tpl.brand_primary_color} onChange={(e) => patch({ brand_primary_color: e.target.value })} className="h-6 w-8 border border-odoo-border rounded cursor-pointer" />
+                <input type="color" value={tpl.brand_primary_color} onChange={(e) => patch({ brand_primary_color: e.target.value })} className="h-6 w-8 border border-ui-border rounded cursor-pointer" />
                 <input className="field-value flex-1" value={tpl.brand_primary_color} onChange={(e) => patch({ brand_primary_color: e.target.value })} />
               </div>
             </Field>
             <Field label="Accent Colour">
               <div className="flex items-center gap-2">
-                <input type="color" value={tpl.brand_accent_color} onChange={(e) => patch({ brand_accent_color: e.target.value })} className="h-6 w-8 border border-odoo-border rounded cursor-pointer" />
+                <input type="color" value={tpl.brand_accent_color} onChange={(e) => patch({ brand_accent_color: e.target.value })} className="h-6 w-8 border border-ui-border rounded cursor-pointer" />
                 <input className="field-value flex-1" value={tpl.brand_accent_color} onChange={(e) => patch({ brand_accent_color: e.target.value })} />
               </div>
             </Field>
@@ -170,10 +170,10 @@ export default function TemplateEditor() {
                   <img
                     src={api.templates.logoUrl(tpl.logo_filename)}
                     alt="Logo"
-                    className="h-12 w-auto max-w-[140px] object-contain border border-odoo-border rounded bg-white p-1"
+                    className="h-12 w-auto max-w-[140px] object-contain border border-ui-border rounded bg-white p-1"
                   />
                 ) : (
-                  <div className="h-12 w-[140px] border border-dashed border-odoo-border rounded text-[10px] text-slate-400 flex items-center justify-center italic bg-slate-50">
+                  <div className="h-12 w-[140px] border border-dashed border-ui-border rounded text-[10px] text-slate-400 flex items-center justify-center italic bg-slate-50">
                     no logo
                   </div>
                 )}
@@ -188,7 +188,7 @@ export default function TemplateEditor() {
                   {tpl.logo_filename && (
                     <button
                       onClick={clearLogo}
-                      className="text-[11px] border border-odoo-border text-slate-600 px-2 py-1 rounded font-semibold hover:bg-slate-50"
+                      className="text-[11px] border border-ui-border text-slate-600 px-2 py-1 rounded font-semibold hover:bg-slate-50"
                     >
                       Remove
                     </button>
@@ -220,14 +220,14 @@ export default function TemplateEditor() {
         </div>
 
         {/* Sections */}
-        <div className="bg-white border border-odoo-border rounded-md p-5 space-y-3">
+        <div className="bg-white border border-ui-border rounded-md p-5 space-y-3">
           <div className="flex items-center justify-between">
             <div className="font-display font-bold text-sai-navy">Sections</div>
             <div className="flex items-center gap-2">
               <select
                 value={addingKind}
                 onChange={(e) => setAddingKind(e.target.value)}
-                className="text-[11px] border border-odoo-border rounded px-2 py-1 outline-none focus:border-sai-blue"
+                className="text-[11px] border border-ui-border rounded px-2 py-1 outline-none focus:border-sai-blue"
               >
                 <option value="">+ Add section…</option>
                 {Object.entries(KIND_LABELS).map(([k, label]) => (
@@ -285,7 +285,7 @@ function SectionCard({
 }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={`border rounded-md overflow-hidden ${section.enabled ? "border-odoo-border" : "border-dashed border-slate-300 bg-slate-50"}`}>
+    <div className={`border rounded-md overflow-hidden ${section.enabled ? "border-ui-border" : "border-dashed border-slate-300 bg-slate-50"}`}>
       <div className="flex items-center gap-2 px-3 py-2">
         <button onClick={onToggle} title={section.enabled ? "Disable" : "Enable"}
                 className={`text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded font-semibold ${
@@ -306,14 +306,14 @@ function SectionCard({
         <button onClick={() => onMove(1)} disabled={index === total - 1}
                 className="text-slate-400 hover:text-sai-navy disabled:opacity-30 text-[14px] leading-none px-1">↓</button>
         <button onClick={() => setOpen(!open)}
-                className="text-[10px] text-slate-500 hover:text-sai-navy px-2 py-0.5 border border-odoo-border rounded">
+                className="text-[10px] text-slate-500 hover:text-sai-navy px-2 py-0.5 border border-ui-border rounded">
           {open ? "Close" : "Edit"}
         </button>
         <button onClick={onRemove} title="Remove section"
                 className="text-slate-300 hover:text-red-500 text-[14px] leading-none px-1">×</button>
       </div>
       {open && (
-        <div className="border-t border-odoo-border px-4 py-3 bg-white">
+        <div className="border-t border-ui-border px-4 py-3 bg-white">
           <SectionConfigForm kind={section.kind} config={section.config} onChange={onConfig} />
         </div>
       )}

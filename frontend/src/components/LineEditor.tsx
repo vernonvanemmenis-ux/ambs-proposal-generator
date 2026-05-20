@@ -103,8 +103,8 @@ export default function LineEditor({
         </button>
       </div>
 
-      <div className="border border-odoo-border rounded-md overflow-x-auto scroll-thin">
-        <div className="grid grid-cols-[minmax(220px,2fr)_minmax(150px,1.2fr)_minmax(130px,1fr)_60px_70px_80px_56px_72px_44px_90px_24px] gap-x-1 bg-slate-50 border-b border-odoo-border px-2 py-1 text-[9px] uppercase tracking-wider font-semibold text-slate-500">
+      <div className="border border-ui-border rounded-md overflow-x-auto scroll-thin">
+        <div className="grid grid-cols-[minmax(220px,2fr)_minmax(150px,1.2fr)_minmax(130px,1fr)_60px_70px_80px_56px_72px_44px_90px_24px] gap-x-1 bg-slate-50 border-b border-ui-border px-2 py-1 text-[9px] uppercase tracking-wider font-semibold text-slate-500">
           <div>Item / Description</div>
           <div>Product Line</div>
           <div>Structure</div>
@@ -127,11 +127,11 @@ export default function LineEditor({
           const margin = marginOf(ln);
           const rowClass = ln.is_optional
             ? "bg-amber-50/40 hover:bg-amber-50"
-            : "hover:bg-odoo-rowhover";
+            : "hover:bg-ui-rowhover";
           return (
             <div
               key={i}
-              className={`grid grid-cols-[minmax(220px,2fr)_minmax(150px,1.2fr)_minmax(130px,1fr)_60px_70px_80px_56px_72px_44px_90px_24px] gap-x-1 items-center border-b border-odoo-border last:border-0 px-2 py-1 text-[11px] ${rowClass}`}
+              className={`grid grid-cols-[minmax(220px,2fr)_minmax(150px,1.2fr)_minmax(130px,1fr)_60px_70px_80px_56px_72px_44px_90px_24px] gap-x-1 items-center border-b border-ui-border last:border-0 px-2 py-1 text-[11px] ${rowClass}`}
             >
               <div className="flex flex-col gap-0.5">
                 <input
@@ -249,7 +249,7 @@ export default function LineEditor({
           );
         })}
         {lines.length > 0 && (
-          <div className="bg-slate-50 border-t border-odoo-border px-2 py-1.5 text-[11px] space-y-0.5">
+          <div className="bg-slate-50 border-t border-ui-border px-2 py-1.5 text-[11px] space-y-0.5">
             <div className="flex justify-end gap-4">
               <div className="text-slate-500 uppercase tracking-wider text-[9px] font-semibold self-center">
                 Subtotal

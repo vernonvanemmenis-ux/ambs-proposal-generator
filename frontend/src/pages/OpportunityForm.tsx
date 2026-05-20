@@ -218,7 +218,7 @@ export default function OpportunityForm() {
 
   return (
     <div className="min-h-[calc(100vh-44px)]">
-      <div className="bg-white border-b border-odoo-border px-4 py-2 flex items-center gap-3">
+      <div className="bg-white border-b border-ui-border px-4 py-2 flex items-center gap-3">
         <Link to="/" className="text-[12px] text-slate-500 hover:text-sai-navy">Apps</Link>
         <div className="text-slate-300">/</div>
         <Link to="/proposals" className="text-[12px] text-slate-500 hover:text-sai-navy">Pipeline</Link>
@@ -251,7 +251,7 @@ export default function OpportunityForm() {
               value={selectedTemplateId ?? ""}
               onChange={(e) => setSelectedTemplateId(e.target.value ? Number(e.target.value) : null)}
               title="Template used when generating"
-              className="text-[12px] border border-odoo-border rounded px-2 py-2 outline-none focus:border-sai-blue bg-white"
+              className="text-[12px] border border-ui-border rounded px-2 py-2 outline-none focus:border-sai-blue bg-white"
             >
               {templates.map((t) => (
                 <option key={t.id} value={t.id}>
@@ -285,7 +285,7 @@ export default function OpportunityForm() {
         </div>
 
         {/* Smart stats */}
-        <div className="bg-white border border-odoo-border rounded-md px-4 py-3 flex gap-6 flex-wrap">
+        <div className="bg-white border border-ui-border rounded-md px-4 py-3 flex gap-6 flex-wrap">
           <SmartStat label="Line Items" value={lines.length} />
           <SmartStat label="Deal Value" value={money(lineSubtotal)} />
           <SmartStat label="Total (incl VAT)" value={money(lineSubtotal * 1.15)} />
@@ -295,7 +295,7 @@ export default function OpportunityForm() {
         </div>
 
         {/* Header fields */}
-        <div className="bg-white border border-odoo-border rounded-md p-6 grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
+        <div className="bg-white border border-ui-border rounded-md p-6 grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
           <Field label="Title">
             <input className="field-value" value={opp.title} onChange={(e) => updateHeader("title", e.target.value)} />
           </Field>
@@ -364,7 +364,7 @@ export default function OpportunityForm() {
 
         {/* Proposal status / send tracking */}
         {proposals.length > 0 && (
-          <div className="bg-white border border-odoo-border rounded-md p-4">
+          <div className="bg-white border border-ui-border rounded-md p-4">
             <div className="flex items-center mb-2">
               <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">
                 Generated proposals
@@ -384,7 +384,7 @@ export default function OpportunityForm() {
                 };
                 const nextLabel = nextLabels[p.status];
                 return (
-                  <div key={p.id} className="flex items-center gap-3 border border-odoo-border rounded px-3 py-2 text-[12px]">
+                  <div key={p.id} className="flex items-center gap-3 border border-ui-border rounded px-3 py-2 text-[12px]">
                     <div className="font-mono text-slate-700">{p.ref}</div>
                     <StatusPill status={p.status} />
                     <div className="flex-1 text-slate-400 text-[11px]">
@@ -415,7 +415,7 @@ export default function OpportunityForm() {
         )}
 
         {/* Line items */}
-        <div className="bg-white border border-odoo-border rounded-md p-4">
+        <div className="bg-white border border-ui-border rounded-md p-4">
           <LineEditor lines={lines} catalogue={catalogue} onChange={onLinesChange} />
           {dirty && (
             <div className="mt-2 text-[11px] text-amber-600">
@@ -425,8 +425,8 @@ export default function OpportunityForm() {
         </div>
 
         {/* Chatter */}
-        <div className="bg-white border border-odoo-border rounded-md">
-          <div className="px-4 py-2 border-b border-odoo-border flex gap-4 text-[11px] font-semibold uppercase tracking-wider">
+        <div className="bg-white border border-ui-border rounded-md">
+          <div className="px-4 py-2 border-b border-ui-border flex gap-4 text-[11px] font-semibold uppercase tracking-wider">
             {(["message", "note", "log"] as const).map(t => (
               <button key={t} onClick={() => setTab(t)}
                       className={`py-1 border-b-2 ${tab === t ? "border-sai-blue text-sai-blue" : "border-transparent text-slate-400 hover:text-slate-600"}`}>
@@ -438,7 +438,7 @@ export default function OpportunityForm() {
             <div className="p-3 flex gap-2">
               <textarea value={newNote} onChange={(e) => setNewNote(e.target.value)}
                         placeholder={tab === "message" ? "Write a message..." : "Log an internal note..."}
-                        className="flex-1 text-[13px] border border-odoo-border rounded px-2 py-1.5 resize-y min-h-[60px] outline-none focus:border-sai-blue" />
+                        className="flex-1 text-[13px] border border-ui-border rounded px-2 py-1.5 resize-y min-h-[60px] outline-none focus:border-sai-blue" />
               <button onClick={postActivity}
                       className="self-start bg-sai-blue text-white text-[11px] px-3 py-1.5 rounded font-semibold hover:opacity-90">
                 Send

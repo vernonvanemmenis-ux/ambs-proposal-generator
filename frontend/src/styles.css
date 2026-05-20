@@ -14,7 +14,7 @@ body {
   background: #f7f7f7;
 }
 
-/* ── Odoo-style chevron status bar ── */
+/* ── Chevron status bar ── */
 .chevron-bar {
   display: inline-flex;
   align-items: stretch;
@@ -45,7 +45,7 @@ body {
 }
 .chevron.is-active:hover { background: var(--sai-blue); color: white; }
 
-/* ── Odoo-style form field ── */
+/* ── Form field ── */
 .field-label {
   font-size: 12px;
   font-weight: 600;

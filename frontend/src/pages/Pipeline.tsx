@@ -125,14 +125,14 @@ export default function Pipeline() {
 
   return (
     <div className="min-h-[calc(100vh-44px)]">
-      <div className="bg-white border-b border-odoo-border px-4 py-2 flex items-center gap-3">
+      <div className="bg-white border-b border-ui-border px-4 py-2 flex items-center gap-3">
         <Link to="/" className="text-[12px] text-slate-500 hover:text-sai-navy">← Apps</Link>
         <div className="text-slate-300">/</div>
         <div className="text-[13px] font-semibold text-sai-navy font-display">Proposals Pipeline</div>
         <div className="flex-1" />
         <Link
           to="/projects"
-          className="text-[11px] border border-odoo-border text-slate-600 px-3 py-1.5 rounded font-semibold hover:bg-slate-50"
+          className="text-[11px] border border-ui-border text-slate-600 px-3 py-1.5 rounded font-semibold hover:bg-slate-50"
         >
           View Projects →
         </Link>
@@ -249,7 +249,7 @@ function NewOpportunityDrawer({
         className="bg-white w-[780px] h-full shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 py-3 border-b border-odoo-border flex items-center">
+        <div className="px-5 py-3 border-b border-ui-border flex items-center">
           <div className="text-[14px] font-display font-bold text-sai-navy">New Opportunity</div>
           <div className="flex-1" />
           <button onClick={onClose}
@@ -267,7 +267,7 @@ function NewOpportunityDrawer({
                 className={`text-[11px] px-3 py-1 rounded border ${
                   mode === "existing"
                     ? "bg-sai-blue text-white border-sai-blue"
-                    : "bg-white text-slate-600 border-odoo-border hover:bg-slate-50"
+                    : "bg-white text-slate-600 border-ui-border hover:bg-slate-50"
                 } disabled:opacity-40`}
               >
                 Existing client
@@ -277,7 +277,7 @@ function NewOpportunityDrawer({
                 className={`text-[11px] px-3 py-1 rounded border ${
                   mode === "new"
                     ? "bg-sai-blue text-white border-sai-blue"
-                    : "bg-white text-slate-600 border-odoo-border hover:bg-slate-50"
+                    : "bg-white text-slate-600 border-ui-border hover:bg-slate-50"
                 }`}
               >
                 + Create new client
@@ -298,7 +298,7 @@ function NewOpportunityDrawer({
                 ))}
               </select>
             ) : (
-              <div className="space-y-2 bg-slate-50 border border-odoo-border rounded p-3">
+              <div className="space-y-2 bg-slate-50 border border-ui-border rounded p-3">
                 <DField label="Name" value={newClient.name} onChange={(v) => setNewClient({ ...newClient, name: v })} />
                 <DField label="Industry" value={newClient.industry} onChange={(v) => setNewClient({ ...newClient, industry: v })} />
                 <DField label="Contact Person" value={newClient.contact_person} onChange={(v) => setNewClient({ ...newClient, contact_person: v })} />
@@ -310,7 +310,7 @@ function NewOpportunityDrawer({
           </div>
 
           {/* Opportunity header */}
-          <div className="pt-2 border-t border-odoo-border space-y-3">
+          <div className="pt-2 border-t border-ui-border space-y-3">
             <DField label="Opportunity Title" value={header.title} onChange={(v) => setHeader({ ...header, title: v })} />
             <div className="grid grid-cols-2 gap-3">
               <DNumField label="Delivery (weeks)" value={header.delivery_weeks}
@@ -337,12 +337,12 @@ function NewOpportunityDrawer({
           </div>
 
           {/* Line items */}
-          <div className="pt-2 border-t border-odoo-border">
+          <div className="pt-2 border-t border-ui-border">
             <LineEditor lines={lines} catalogue={catalogue} onChange={setLines} />
           </div>
         </div>
 
-        <div className="px-5 py-3 border-t border-odoo-border flex justify-end gap-2">
+        <div className="px-5 py-3 border-t border-ui-border flex justify-end gap-2">
           <button onClick={onClose} className="text-[12px] px-3 py-1.5 text-slate-500 hover:text-slate-800">
             Cancel
           </button>

@@ -42,7 +42,7 @@ export default function Projects() {
 
   return (
     <div className="min-h-[calc(100vh-44px)]">
-      <div className="bg-white border-b border-odoo-border px-4 py-2 flex items-center gap-3">
+      <div className="bg-white border-b border-ui-border px-4 py-2 flex items-center gap-3">
         <Link to="/" className="text-[12px] text-slate-500 hover:text-sai-navy">← Apps</Link>
         <div className="text-slate-300">/</div>
         <div className="text-[13px] font-semibold text-sai-navy font-display">Projects</div>
@@ -61,7 +61,7 @@ export default function Projects() {
           <Section title="Archived" projects={archived} onArchive={unarchive} archived={true} />
         )}
         {projects.length === 0 && !busy && (
-          <div className="bg-white border border-odoo-border rounded-md p-10 text-center">
+          <div className="bg-white border border-ui-border rounded-md p-10 text-center">
             <div className="text-[15px] font-display font-bold text-sai-navy">No projects yet</div>
             <div className="text-[12px] text-slate-500 mt-1">
               Drag an opportunity to <span className="font-semibold text-emerald-600">Won</span> in the pipeline
@@ -98,7 +98,7 @@ function Section({
           return (
             <div
               key={p.id}
-              className={`bg-white border border-odoo-border rounded-md p-4 shadow-card hover:shadow-kanban transition ${
+              className={`bg-white border border-ui-border rounded-md p-4 shadow-card hover:shadow-kanban transition ${
                 archived ? "opacity-70" : ""
               }`}
             >
@@ -124,7 +124,7 @@ function Section({
                   ))}
                 </div>
               </Link>
-              <div className="mt-3 pt-3 border-t border-odoo-border flex justify-end gap-2">
+              <div className="mt-3 pt-3 border-t border-ui-border flex justify-end gap-2">
                 <button
                   onClick={() => onArchive(p)}
                   className="text-[10px] text-slate-500 hover:text-slate-800"

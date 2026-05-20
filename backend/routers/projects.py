@@ -1,4 +1,4 @@
-"""Projects / Tasks / Attachments — Odoo-style post-Won construction lifecycle.
+"""Projects / Tasks / Attachments — post-Won construction lifecycle.
 
 Created automatically when an Opportunity is Won (see opportunities.py), but also
 manually creatable. Each project has its own stages (so users can rename/add/remove

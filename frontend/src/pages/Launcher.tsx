@@ -143,7 +143,7 @@ export default function Launcher() {
               <div className="text-[11px] text-slate-500 mt-0.5">
                 Your data is stored on this machine. Survives app updates. Nothing is sent to the cloud unless you explicitly use an online feature.
               </div>
-              <div className="mt-2 bg-slate-50 border border-odoo-border rounded px-2 py-1.5 font-mono text-[11px] text-slate-700 break-all">
+              <div className="mt-2 bg-slate-50 border border-ui-border rounded px-2 py-1.5 font-mono text-[11px] text-slate-700 break-all">
                 {dbInfo?.db_path ?? "…"}
               </div>
             </div>
@@ -156,16 +156,16 @@ export default function Launcher() {
               </button>
               <button
                 onClick={copyPath}
-                className="text-[11px] border border-odoo-border text-slate-600 px-3 py-1.5 rounded font-semibold hover:bg-slate-50 whitespace-nowrap"
+                className="text-[11px] border border-ui-border text-slate-600 px-3 py-1.5 rounded font-semibold hover:bg-slate-50 whitespace-nowrap"
               >
                 {copied ? "Copied ✓" : "Copy path"}
               </button>
             </div>
           </div>
           {dbInfo && (
-            <div className="mt-3 pt-3 border-t border-odoo-border grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-[11px]">
+            <div className="mt-3 pt-3 border-t border-ui-border grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-[11px]">
               {dbInfo.tables.map((t) => (
-                <div key={t.name} className="bg-slate-50 border border-odoo-border rounded px-2 py-1 flex items-center justify-between">
+                <div key={t.name} className="bg-slate-50 border border-ui-border rounded px-2 py-1 flex items-center justify-between">
                   <span className="text-slate-600 truncate">{t.name}</span>
                   <span className="font-semibold text-sai-navy tabular-nums">{t.rows}</span>
                 </div>

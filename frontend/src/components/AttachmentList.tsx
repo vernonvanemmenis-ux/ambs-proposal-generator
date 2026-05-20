@@ -53,7 +53,7 @@ export default function AttachmentList({ projectId, taskId, attachments, onChang
   };
 
   return (
-    <div className="border border-odoo-border rounded-md p-3">
+    <div className="border border-ui-border rounded-md p-3">
       <div className="flex items-center justify-between mb-2">
         <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">
           Attachments
@@ -76,14 +76,14 @@ export default function AttachmentList({ projectId, taskId, attachments, onChang
       <div
         onDragOver={(e) => e.preventDefault()}
         onDrop={onDrop}
-        className="border border-dashed border-odoo-border rounded p-3 mb-2 text-center text-[11px] text-slate-400"
+        className="border border-dashed border-ui-border rounded p-3 mb-2 text-center text-[11px] text-slate-400"
       >
         Drop a file here, or use + Add file. Max 25 MB.
       </div>
 
       <div className="space-y-1">
         {attachments.map((att) => (
-          <div key={att.id} className="flex items-center gap-2 text-[12px] border border-odoo-border rounded px-2 py-1">
+          <div key={att.id} className="flex items-center gap-2 text-[12px] border border-ui-border rounded px-2 py-1">
             <span className="flex-1 truncate text-slate-700" title={att.filename}>{att.filename}</span>
             <span className="text-[10px] text-slate-400 tabular-nums">{prettyBytes(att.size_bytes)}</span>
             <a

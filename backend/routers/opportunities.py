@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/opportunities", tags=["opportunities"])
 
 
 def _bootstrap_project_for_opportunity(db: Session, opp: Opportunity) -> Project:
-    """Spin up a construction project mirroring Odoo's post-Won flow.
+    """Spin up a construction project once the opportunity is Won.
 
     Creates the 5 default stages and a single seed task in the first stage.
     Idempotent: if the opportunity already has a project, returns the existing one.

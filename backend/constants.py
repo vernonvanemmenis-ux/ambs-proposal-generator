@@ -50,7 +50,7 @@ SECTION_KINDS = [
     "page_break",
 ]
 
-# Quotation/Proposal lifecycle (mirrors Odoo Sales: Draft → Sent → Viewed → Signed → Paid).
+# Quotation/Proposal lifecycle: Draft → Sent → Viewed → Signed → Paid.
 PROPOSAL_STATUS_VALUES = ["draft", "sent", "viewed", "signed", "paid"]
 
 # Default construction-project task stages, applied when an Opportunity is Won.

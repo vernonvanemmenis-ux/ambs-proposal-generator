@@ -52,7 +52,7 @@ export default function Templates() {
 
   return (
     <div className="min-h-[calc(100vh-44px)]">
-      <div className="bg-white border-b border-odoo-border px-4 py-2 flex items-center gap-3">
+      <div className="bg-white border-b border-ui-border px-4 py-2 flex items-center gap-3">
         <Link to="/" className="text-[12px] text-slate-500 hover:text-sai-navy">← Apps</Link>
         <div className="text-slate-300">/</div>
         <div className="text-[13px] font-semibold text-sai-navy font-display">Proposal Templates</div>
@@ -70,7 +70,7 @@ export default function Templates() {
           {list.map((t) => (
             <div
               key={t.id}
-              className="bg-white border border-odoo-border rounded-md p-4 shadow-card hover:shadow-kanban transition cursor-pointer"
+              className="bg-white border border-ui-border rounded-md p-4 shadow-card hover:shadow-kanban transition cursor-pointer"
               onClick={() => nav(`/templates/${t.id}`)}
             >
               <div className="flex items-start justify-between">
@@ -88,7 +88,7 @@ export default function Templates() {
               <div className="mt-3 text-[11px] text-slate-500">
                 {t.sections.filter((s) => s.enabled).length} of {t.sections.length} sections enabled
               </div>
-              <div className="mt-3 pt-3 border-t border-odoo-border flex gap-2">
+              <div className="mt-3 pt-3 border-t border-ui-border flex gap-2">
                 <button
                   onClick={(e) => { e.stopPropagation(); nav(`/templates/${t.id}`); }}
                   className="text-[10px] bg-sai-blue text-white px-2 py-1 rounded font-semibold hover:opacity-90"
@@ -97,7 +97,7 @@ export default function Templates() {
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); duplicate(t); }}
-                  className="text-[10px] border border-odoo-border text-slate-600 px-2 py-1 rounded font-semibold hover:bg-slate-50"
+                  className="text-[10px] border border-ui-border text-slate-600 px-2 py-1 rounded font-semibold hover:bg-slate-50"
                 >
                   Duplicate
                 </button>
@@ -111,7 +111,7 @@ export default function Templates() {
             </div>
           ))}
           {list.length === 0 && (
-            <div className="col-span-full bg-white border border-odoo-border rounded-md p-10 text-center text-slate-400 italic">
+            <div className="col-span-full bg-white border border-ui-border rounded-md p-10 text-center text-slate-400 italic">
               No templates yet. Click + New Template.
             </div>
           )}

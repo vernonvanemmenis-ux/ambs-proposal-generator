@@ -20,7 +20,7 @@ export type OpportunityLine = {
   unit_of_measure: string;
   unit_rate: number;
   line_total: number;
-  // Sales extras (Odoo-style)
+  // Sales extras
   discount_pct: number;
   is_optional: boolean;
   cost_rate: number;

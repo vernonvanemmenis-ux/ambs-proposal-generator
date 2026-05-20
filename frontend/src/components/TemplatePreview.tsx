@@ -102,7 +102,7 @@ export default function TemplatePreview({
         className="ml-auto bg-slate-200 w-full md:w-[900px] h-full shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-4 py-2 bg-white border-b border-odoo-border flex items-center gap-3">
+        <div className="px-4 py-2 bg-white border-b border-ui-border flex items-center gap-3">
           <div className="text-[13px] font-display font-bold text-sai-navy">Preview</div>
           <div className="text-slate-300">·</div>
           <div className="text-[12px] text-slate-500 truncate">{template.name}</div>
@@ -111,7 +111,7 @@ export default function TemplatePreview({
           <select
             value={selectedId ?? ""}
             onChange={(e) => setSelectedId(e.target.value ? Number(e.target.value) : null)}
-            className="text-[11px] border border-odoo-border rounded px-2 py-1 outline-none focus:border-sai-blue bg-white max-w-[280px]"
+            className="text-[11px] border border-ui-border rounded px-2 py-1 outline-none focus:border-sai-blue bg-white max-w-[280px]"
           >
             <option value="">— sample data —</option>
             {opps.map((o) => (

@@ -13,8 +13,8 @@ export default {
           midnight: "#111827",
           deep: "#070d18",
         },
-        // Odoo-style utility colours
-        odoo: {
+        // Neutral UI utility colours
+        ui: {
           surface: "#f7f7f7",
           border: "#e2e4ea",
           rowhover: "#f3f6fb",

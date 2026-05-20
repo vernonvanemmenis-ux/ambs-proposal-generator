@@ -54,7 +54,7 @@ export default function ProjectBoard() {
 
   return (
     <div className="min-h-[calc(100vh-44px)]">
-      <div className="bg-white border-b border-odoo-border px-4 py-2 flex items-center gap-3">
+      <div className="bg-white border-b border-ui-border px-4 py-2 flex items-center gap-3">
         <Link to="/" className="text-[12px] text-slate-500 hover:text-sai-navy">Apps</Link>
         <div className="text-slate-300">/</div>
         <Link to="/projects" className="text-[12px] text-slate-500 hover:text-sai-navy">Projects</Link>
@@ -64,7 +64,7 @@ export default function ProjectBoard() {
         {project.opportunity_id && (
           <Link
             to={`/proposals/${project.opportunity_id}`}
-            className="text-[11px] border border-odoo-border text-slate-600 px-3 py-1.5 rounded font-semibold hover:bg-slate-50"
+            className="text-[11px] border border-ui-border text-slate-600 px-3 py-1.5 rounded font-semibold hover:bg-slate-50"
           >
             ← Source opportunity
           </Link>
@@ -228,7 +228,7 @@ function TaskDrawer({
         className="bg-white w-[640px] h-full shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-5 py-3 border-b border-odoo-border flex items-center">
+        <div className="px-5 py-3 border-b border-ui-border flex items-center">
           <div className="text-[14px] font-display font-bold text-sai-navy">Task details</div>
           <div className="flex-1" />
           <button
@@ -306,7 +306,7 @@ function TaskDrawer({
           />
         </div>
 
-        <div className="px-5 py-3 border-t border-odoo-border flex justify-between">
+        <div className="px-5 py-3 border-t border-ui-border flex justify-between">
           <button
             onClick={remove}
             className="text-[11px] text-red-500 hover:text-red-700 font-semibold"

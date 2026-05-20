@@ -2,7 +2,7 @@
 
 An offline-first, Windows-installable business tool for **African Modular Building Solutions (AMBS)** — built as a demo of what SolutionsAI can deliver.
 
-- **UI:** Odoo-inspired layout (app launcher, kanban pipeline, chevron form view, chatter log) wrapped in the SolutionsAI brand.
+- **UI:** ERP-style layout (app launcher, kanban pipeline, chevron form view, chatter log) wrapped in the SolutionsAI brand.
 - **Runs offline:** SQLite database, local proposal generation via `python-docx`.
 - **Online extras:** PandaDoc send flow and auto-updates light up when the host is connected.
 - **Upgradable:** a payload/launcher split means bug fixes and improvements roll out automatically — no reinstall.

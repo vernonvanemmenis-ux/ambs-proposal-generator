@@ -129,7 +129,7 @@ function Column<T extends KanbanItem>({
       <div
         ref={setNodeRef}
         className={`rounded-b-md p-2 space-y-2 min-h-[200px] transition-colors ${
-          isOver ? "bg-sai-bluepale" : "bg-odoo-surface"
+          isOver ? "bg-sai-bluepale" : "bg-ui-surface"
         }`}
       >
         {items.map((it) => (
