@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { api, type Catalogue, type Client, type Opportunity, type OpportunityLineDraft } from "../api";
+import { api, type Catalogue, type Client, type Opportunity, type OpportunityLineDraft, type OpportunityTemplate } from "../api";
 import LineEditor from "../components/LineEditor";
 import KanbanBoard, { type KanbanColumn } from "../components/KanbanBoard";
 
@@ -179,6 +179,7 @@ function NewOpportunityDrawer({
 }) {
   const [clients, setClients] = useState<Client[]>([]);
   const [catalogue, setCatalogue] = useState<Catalogue | null>(null);
+  const [oppTemplates, setOppTemplates] = useState<OpportunityTemplate[]>([]);
   const [mode, setMode] = useState<"existing" | "new">("existing");
   const [clientId, setClientId] = useState<number | "">("");
   const [newClient, setNewClient] = useState({
@@ -194,6 +195,7 @@ function NewOpportunityDrawer({
     delivery_weeks: 6,
     priority: 0,
     notes: "",
+    deposit_pct: 40,
   });
   const [lines, setLines] = useState<OpportunityLineDraft[]>([]);
   const [busy, setBusy] = useState(false);
@@ -209,7 +211,32 @@ function NewOpportunityDrawer({
       }
     });
     api.catalogue().then(setCatalogue);
+    api.opportunityTemplates.list().then(setOppTemplates).catch(() => setOppTemplates([]));
   }, []);
+
+  const applyTemplate = (tpl: OpportunityTemplate) => {
+    setHeader((h) => ({
+      ...h,
+      title: tpl.title_hint || tpl.name,
+      delivery_weeks: tpl.default_delivery_weeks,
+      deposit_pct: tpl.default_deposit_pct,
+    }));
+    setLines(
+      tpl.default_lines.map((ln, i) => ({
+        sequence: i,
+        item_code: ln.item_code,
+        product_line: ln.product_line,
+        structure_type: ln.structure_type,
+        description: ln.description,
+        quantity: ln.quantity,
+        unit_of_measure: ln.unit_of_measure,
+        unit_rate: ln.unit_rate,
+        discount_pct: 0,
+        is_optional: ln.is_optional,
+        cost_rate: 0,
+      }))
+    );
+  };
 
   const canSubmit =
     !!header.title.trim() &&
@@ -233,6 +260,7 @@ function NewOpportunityDrawer({
         delivery_weeks: header.delivery_weeks,
         priority: header.priority,
         notes: header.notes,
+        deposit_pct: header.deposit_pct,
         lines: lines.map((ln, i) => ({ ...ln, sequence: i })),
       } as any);
       onCreated(created);
@@ -257,6 +285,32 @@ function NewOpportunityDrawer({
         </div>
 
         <div className="flex-1 overflow-y-auto scroll-thin px-5 py-4 space-y-4">
+          {/* Quick-start templates */}
+          {oppTemplates.length > 0 && (
+            <div className="bg-sai-bluepale border border-sai-blue/30 rounded-md p-3">
+              <div className="text-[11px] uppercase tracking-wider font-semibold text-sai-blue mb-2">
+                ⚡ Quick start from a project template
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {oppTemplates.filter((t) => t.is_active).map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    onClick={() => applyTemplate(tpl)}
+                    title={tpl.description}
+                    className="text-[11px] bg-white border border-sai-blue text-sai-blue px-3 py-1.5 rounded font-semibold hover:bg-sai-blue hover:text-white transition flex items-center gap-1.5"
+                  >
+                    <span>{tpl.icon}</span>
+                    <span>{tpl.name}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="text-[10px] text-slate-500 mt-2 italic">
+                Picks pre-fill the title, delivery, deposit, and line items. You can still edit everything below.
+              </div>
+            </div>
+          )}
+
           {/* Client */}
           <div>
             <div className="field-label mb-1">Client</div>

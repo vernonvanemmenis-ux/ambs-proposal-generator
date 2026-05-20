@@ -1,23 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import Item
-from ..schemas import ItemOut
+from ..schemas import ItemIn, ItemOut
 
 router = APIRouter(prefix="/api/items", tags=["items"])
-
-
-class ItemIn(BaseModel):
-    code: str
-    name: str
-    category: str = "Component"
-    product_line: str = ""
-    structure_type: str = ""
-    unit_of_measure: str = "each"
-    default_rate: float = 0.0
-    description: str = ""
 
 
 @router.get("", response_model=list[ItemOut])

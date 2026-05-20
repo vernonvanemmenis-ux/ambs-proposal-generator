@@ -46,7 +46,7 @@ DEFAULT_MANIFEST_URL = (
     "https://github.com/vernonvanemmenis-ux/ambs-proposal-generator"
     "/releases/latest/download/manifest.json"
 )
-APP_VERSION = "0.3.0"  # bumped at each release; also written to payload VERSION file
+APP_VERSION = "0.4.0"  # bumped at each release; also written to payload VERSION file
 
 
 # ----------------------------------------------------------------- dataclasses

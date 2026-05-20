@@ -39,7 +39,35 @@ export type Item = {
   unit_of_measure: string;
   default_rate: number;
   description: string;
+  tags: string;
 };
+
+export type TemplateLine = {
+  item_code: string;
+  description: string;
+  quantity: number;
+  unit_of_measure: string;
+  unit_rate: number;
+  product_line: string;
+  structure_type: string;
+  is_optional: boolean;
+};
+
+export type OpportunityTemplate = {
+  id: number;
+  name: string;
+  description: string;
+  icon: string;
+  industry: string;
+  title_hint: string;
+  default_delivery_weeks: number;
+  default_deposit_pct: number;
+  default_lines: TemplateLine[];
+  is_active: boolean;
+  created_at: string;
+};
+
+export type OpportunityTemplateDraft = Omit<OpportunityTemplate, "id" | "created_at"> & { id?: number };
 
 export type OpportunityLite = {
   id: number;
@@ -361,6 +389,25 @@ export const api = {
       deleteAttachment: (projectId: number, taskId: number, attId: number): Promise<{ ok: true }> =>
         fetch(`/api/projects/${projectId}/tasks/${taskId}/attachments/${attId}`, { method: "DELETE" }).then(j),
     },
+  },
+
+  opportunityTemplates: {
+    list: (): Promise<OpportunityTemplate[]> => fetch("/api/opportunity-templates").then(j),
+    get: (id: number): Promise<OpportunityTemplate> => fetch(`/api/opportunity-templates/${id}`).then(j),
+    create: (body: Partial<OpportunityTemplateDraft>): Promise<OpportunityTemplate> =>
+      fetch("/api/opportunity-templates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    update: (id: number, body: Partial<OpportunityTemplateDraft>): Promise<OpportunityTemplate> =>
+      fetch(`/api/opportunity-templates/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    delete: (id: number): Promise<{ ok: true }> =>
+      fetch(`/api/opportunity-templates/${id}`, { method: "DELETE" }).then(j),
   },
 
   templates: {

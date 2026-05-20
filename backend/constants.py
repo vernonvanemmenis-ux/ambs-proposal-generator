@@ -34,7 +34,7 @@ UNITS_OF_MEASURE = [
     "lump sum",
 ]
 
-SCHEMA_VERSION = 6  # bumped when DB schema changes — triggers wipe+reseed
+SCHEMA_VERSION = 7  # bumped when DB schema changes — triggers wipe+reseed
 
 # Available section kinds for the proposal template editor. Each kind has its
 # own UI form + renderer in proposal_generator.py.

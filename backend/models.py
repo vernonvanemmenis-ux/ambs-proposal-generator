@@ -114,6 +114,29 @@ class Item(Base):
     unit_of_measure: Mapped[str] = mapped_column(String(20), default="each")
     default_rate: Mapped[float] = mapped_column(Float, default=0.0)
     description: Mapped[str] = mapped_column(String(300), default="")
+    # Comma-separated tags for the catalogue picker filter (e.g. "Modular,Mining,HVAC")
+    tags: Mapped[str] = mapped_column(String(400), default="")
+
+
+class OpportunityTemplate(Base):
+    """Quick-start template for new opportunities.
+
+    Picking a template in the New Opportunity drawer auto-fills the title hint,
+    header defaults (delivery weeks, deposit %), and a pre-built list of line
+    items. Each line is stored as JSON so we don't need a join table.
+    """
+    __tablename__ = "opportunity_templates"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    description: Mapped[str] = mapped_column(String(500), default="")
+    icon: Mapped[str] = mapped_column(String(20), default="📋")
+    industry: Mapped[str] = mapped_column(String(80), default="")
+    title_hint: Mapped[str] = mapped_column(String(200), default="")
+    default_delivery_weeks: Mapped[int] = mapped_column(Integer, default=6)
+    default_deposit_pct: Mapped[float] = mapped_column(Float, default=40.0)
+    default_lines_json: Mapped[str] = mapped_column(Text, default="[]")
+    is_active: Mapped[int] = mapped_column(Integer, default=1)  # bool-as-int
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class ProposalTemplate(Base):

@@ -28,7 +28,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from .db import Base, engine, LOGOS_DIR
-from .routers import clients, opportunities, proposals, status, updates, catalogue, items, database, templates, projects
+from .routers import clients, opportunities, proposals, status, updates, catalogue, items, database, templates, projects, opportunity_templates
 from .seed import seed
 
 
@@ -64,6 +64,7 @@ app.include_router(items.router)
 app.include_router(database.router)
 app.include_router(templates.router)
 app.include_router(projects.router)
+app.include_router(opportunity_templates.router)
 
 # Brand assets (logos) — accessible at /static/*
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

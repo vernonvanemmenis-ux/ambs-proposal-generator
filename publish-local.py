@@ -1,22 +1,23 @@
 """Publish a new payload directly to the installed app on this machine.
 
-The app already has an auto-updater that swaps
-`%APPDATA%\\SolutionsAI\\AMBSProposalGen\\payload\\pending\\` into
-`payload\\current\\` on the next launch when an `APPLY_ON_NEXT_BOOT` marker is
-present. This script stages that locally — no GitHub release, no network.
+The installed app's launcher has a payload-swap mechanism in `%APPDATA%`, BUT
+PyInstaller's frozen importer wins over `sys.path` insertion, so swapping
+appdata isn't enough — the bundled `_internal/payload/` next to the EXE is
+what actually loads. This script writes to BOTH locations:
+
+  * `%APPDATA%\\SolutionsAI\\AMBSProposalGen\\payload\\pending\\` — for the
+    appdata swap mechanism (works once the launcher bug is fixed in a future
+    installer rebuild)
+  * `C:\\Program Files\\SolutionsAI\\AMBSProposalGen\\_internal\\payload\\` —
+    the location PyInstaller actually loads from. **Requires admin.**
+    The script will detect a permission error and tell you to re-run via
+    publish-local-admin.bat which self-elevates.
 
 Usage:
     python publish-local.py                    # auto-bumps patch (0.3.0 -> 0.3.1)
     python publish-local.py 0.4.0              # explicit version
     python publish-local.py 0.4.0 --no-build   # skip `npm run build` (faster)
-
-What it stages
---------------
-    %APPDATA%\\SolutionsAI\\AMBSProposalGen\\payload\\pending\\
-      backend\\           (current source tree)
-      frontend\\dist\\    (just-built static frontend)
-      VERSION             (new version string)
-    %APPDATA%\\SolutionsAI\\AMBSProposalGen\\payload\\APPLY_ON_NEXT_BOOT
+    publish-local-admin.bat                    # one-click self-elevating run
 
 Heads up
 --------
@@ -24,7 +25,9 @@ Heads up
   SQLite DB will be wiped + reseeded on next boot (existing behaviour,
   backend/db.py:_ensure_schema_version). Generated .docx proposals under
   %APPDATA%\\...\\output\\ are NOT touched.
-* If the new payload crashes 3x in a row the launcher auto-rolls back.
+* The bundled-location write needs admin elevation. Without it, only the
+  appdata swap is staged (and that swap's effect is currently invisible
+  because of the PyInstaller importer issue).
 """
 from __future__ import annotations
 
@@ -38,6 +41,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 BACKEND = ROOT / "backend"
 FRONTEND_DIST = ROOT / "frontend" / "dist"
+
+# Candidate install locations for the bundled payload (the one PyInstaller's
+# frozen importer actually loads from). First match wins.
+_INSTALL_CANDIDATES = [
+    Path(os.getenv("ProgramFiles") or r"C:\Program Files") / "SolutionsAI" / "AMBSProposalGen",
+    Path(os.getenv("ProgramFiles(x86)") or r"C:\Program Files (x86)") / "SolutionsAI" / "AMBSProposalGen",
+]
+
+
+def installed_bundled_payload() -> Path | None:
+    """Locate the installed app's `_internal/payload/` directory if present."""
+    for root in _INSTALL_CANDIDATES:
+        p = root / "_internal" / "payload"
+        if p.exists():
+            return p
+    return None
 
 
 def appdata_payload_root() -> Path:
@@ -111,6 +130,29 @@ def stage_pending(version: str) -> Path:
     return pending
 
 
+def overwrite_bundled(version: str, bundled_root: Path) -> Path:
+    """Replace `_internal/payload/{backend,frontend/dist}` with current source.
+
+    Needed because the installed launcher's `sys.path.insert` does NOT actually
+    override PyInstaller's frozen importer, so the bundled `backend/` is what
+    runs. Writing to Program Files needs admin elevation — caller catches
+    PermissionError and re-runs via the .bat wrapper.
+    """
+    # Remove and replace `backend/` cleanly (don't merge — stale files would linger).
+    bundled_backend = bundled_root / "backend"
+    if bundled_backend.exists():
+        shutil.rmtree(bundled_backend)
+    shutil.copytree(BACKEND, bundled_backend, ignore=_ignore_pyc)
+
+    bundled_dist = bundled_root / "frontend" / "dist"
+    if bundled_dist.exists():
+        shutil.rmtree(bundled_dist)
+    shutil.copytree(FRONTEND_DIST, bundled_dist)
+
+    (bundled_root / "VERSION").write_text(version, encoding="utf-8")
+    return bundled_root
+
+
 def write_marker(version: str) -> Path:
     marker = appdata_payload_root() / "APPLY_ON_NEXT_BOOT"
     marker.write_text(version, encoding="utf-8")
@@ -162,12 +204,31 @@ def main():
     print()
     print(f"Staged payload : {pending}")
     print(f"Marker dropped : {marker}")
+
+    # Also overwrite the bundled `_internal/payload/` so the next launch
+    # actually picks up the new code. Needs admin elevation.
+    bundled = installed_bundled_payload()
+    if bundled is None:
+        print()
+        print("No installed app detected — skipping bundled-payload overwrite.")
+    else:
+        try:
+            overwrite_bundled(new_version, bundled)
+            print(f"Bundled payload: {bundled}  (replaced in place)")
+        except PermissionError as e:
+            print()
+            print("=" * 70)
+            print(f"PermissionError writing to {bundled}")
+            print(str(e))
+            print()
+            print("Run via the self-elevating wrapper instead:")
+            print(r"  publish-local-admin.bat")
+            print("or right-click publish-local.py and 'Run as administrator'.")
+            print("=" * 70)
+            sys.exit(2)
+
     print()
     print("Next step: CLOSE the AMBS Proposal Generator app, then reopen it.")
-    print("The launcher swaps pending/ -> current/ on boot and runs the new code.")
-    print()
-    print("Crash rollback: if the new payload fails 3x in a row, the launcher")
-    print("restores the previous payload automatically.")
     print(r"Logs: %APPDATA%\SolutionsAI\AMBSProposalGen\logs\app.log")
 
 

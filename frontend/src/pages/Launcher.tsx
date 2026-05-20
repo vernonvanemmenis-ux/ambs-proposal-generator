@@ -17,9 +17,9 @@ const TILES: Tile[] = [
   { id: "projects",  label: "Projects",  color: "#f59e0b", icon: "🏗️", href: "/projects" },
   { id: "clients",   label: "Clients",   color: "#4A90D9", icon: "🏢", href: "/clients" },
   { id: "items",     label: "Items",     color: "#10b981", icon: "📦", href: "/items" },
-  { id: "templates", label: "Templates", color: "#8b5cf6", icon: "🧩", href: "/templates" },
+  { id: "templates", label: "Doc Templates", color: "#8b5cf6", icon: "🧩", href: "/templates" },
+  { id: "opp-templates", label: "Project Templates", color: "#06b6d4", icon: "⚡", href: "/opportunity-templates" },
   { id: "sales",     label: "Sales",     color: "#64748b", icon: "💰", disabled: true },
-  { id: "inventory", label: "Inventory", color: "#64748b", icon: "🗃️", disabled: true },
   { id: "hr",        label: "HR",        color: "#64748b", icon: "👥", disabled: true },
 ];
 

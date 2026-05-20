@@ -11,6 +11,27 @@ import {
   type Template,
 } from "../api";
 import LineEditor from "../components/LineEditor";
+import HelpPopover from "../components/HelpPopover";
+
+const FIELD_HELP = {
+  salesperson: {
+    id: "opp.salesperson",
+    title: "Salesperson",
+    body: "AMBS team member to credit on this deal. Shows on the .docx as the named contact and as initials on the Pipeline card.",
+    example: "Vernon van Emmenis",
+  },
+  valid_until: {
+    id: "opp.valid_until",
+    title: "Quotation valid until",
+    body: "After this date the quote is treated as expired. The Pipeline card flips to a red 'Expired' badge so you can chase or re-issue. Typical validity for AMBS quotes is 30 days from issue.",
+  },
+  deposit_pct: {
+    id: "opp.deposit_pct",
+    title: "Deposit on signature (%)",
+    body: "Percentage of the subtotal the client pays on acceptance. Surfaced in the .docx commercial section as 'Deposit due on signature'. AMBS standard is 40% deposit, 40% on delivery, 20% on handover — adjust as the deal requires.",
+    example: "40% on R 11 200 000 = R 4 480 000 deposit.",
+  },
+} as const;
 
 const STAGES = ["new", "qualified", "proposal", "won", "lost"] as const;
 type Stage = (typeof STAGES)[number];
@@ -318,7 +339,7 @@ export default function OpportunityForm() {
               ))}
             </div>
           </Field>
-          <Field label="Salesperson">
+          <Field label="Salesperson" help={<HelpPopover help={FIELD_HELP.salesperson} />}>
             <input
               className="field-value"
               placeholder="e.g. Vernon van Emmenis"
@@ -326,7 +347,7 @@ export default function OpportunityForm() {
               onChange={(e) => updateHeader("salesperson", e.target.value)}
             />
           </Field>
-          <Field label="Quotation valid until">
+          <Field label="Quotation valid until" help={<HelpPopover help={FIELD_HELP.valid_until} />}>
             <input
               type="date"
               className="field-value"
@@ -334,7 +355,7 @@ export default function OpportunityForm() {
               onChange={(e) => updateHeader("valid_until", e.target.value || null)}
             />
           </Field>
-          <Field label="Deposit on signature (%)">
+          <Field label="Deposit on signature (%)" help={<HelpPopover help={FIELD_HELP.deposit_pct} />}>
             <input
               type="number"
               min={0}
@@ -475,10 +496,13 @@ export default function OpportunityForm() {
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children, help }: { label: string; children: React.ReactNode; help?: React.ReactNode }) {
   return (
     <div>
-      <div className="field-label">{label}</div>
+      <div className="field-label flex items-center">
+        {label}
+        {help}
+      </div>
       {children}
     </div>
   );

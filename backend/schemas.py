@@ -97,6 +97,58 @@ class ItemOut(BaseModel):
     unit_of_measure: str
     default_rate: float
     description: str
+    tags: str = ""
+
+
+class ItemIn(BaseModel):
+    code: str
+    name: str
+    category: str = "Component"
+    product_line: str = ""
+    structure_type: str = ""
+    unit_of_measure: str = "each"
+    default_rate: float = 0.0
+    description: str = ""
+    tags: str = ""
+
+
+# ---------------- Opportunity templates ----------------
+class TemplateLine(BaseModel):
+    item_code: str = ""
+    description: str = ""
+    quantity: float = 1.0
+    unit_of_measure: str = "each"
+    unit_rate: float = 0.0
+    product_line: str = ""
+    structure_type: str = ""
+    is_optional: bool = False
+
+
+class OpportunityTemplateOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    description: str
+    icon: str
+    industry: str
+    title_hint: str
+    default_delivery_weeks: int
+    default_deposit_pct: float
+    default_lines: list[TemplateLine] = []
+    is_active: bool
+    created_at: datetime
+
+
+class OpportunityTemplateIn(BaseModel):
+    name: str
+    description: str = ""
+    icon: str = "📋"
+    industry: str = ""
+    title_hint: str = ""
+    default_delivery_weeks: int = 6
+    default_deposit_pct: float = 40.0
+    default_lines: list[TemplateLine] = []
+    is_active: bool = True
 
 
 # ---------------- Activity / Proposal / Status ----------------

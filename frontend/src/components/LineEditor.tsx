@@ -1,7 +1,52 @@
 import { useEffect, useState } from "react";
 import { api, type Catalogue, type Item, type OpportunityLineDraft } from "../api";
+import CataloguePicker from "./CataloguePicker";
+import HelpPopover, { type HelpContent } from "./HelpPopover";
 
 type Line = OpportunityLineDraft & { id?: number };
+
+const HELP: Record<string, HelpContent> = {
+  quantity: {
+    id: "line.quantity",
+    title: "Quantity",
+    body:
+      "How many of this item are you supplying. Match the unit of measure on the right — for area-based items use m², for individual units use 'each', for trips/days use the right time unit.",
+    example: "80 sleeping units = 960 m² (12 m² × 80) when priced by area.",
+  },
+  uom: {
+    id: "line.uom",
+    title: "Unit of measure",
+    body:
+      "How the item is priced.\n• m² for area-priced structures (modules, classrooms).\n• each for whole units (containers, AC units, doors).\n• km for delivery, day for crane, night for crew accommodation.\n• lump sum for fixed services like commissioning.",
+  },
+  unit_rate: {
+    id: "line.unit_rate",
+    title: "Unit rate (ZAR)",
+    body:
+      "Price per single unit before discount. Auto-fills from the items catalogue when you pick an item, but you can override per quote.",
+    example: "STR-OFF-PF defaults to R 9 200 / m². Override to R 9 500 / m² if site conditions require.",
+  },
+  discount: {
+    id: "line.discount",
+    title: "Discount %",
+    body:
+      "Percentage discount applied to this line only. The .docx proposal shows the discount column and recalculates the line total. Leave at 0 for no discount.",
+    example: "10% discount on R 100 000 line = R 90 000 final.",
+  },
+  cost: {
+    id: "line.cost",
+    title: "Cost rate (internal)",
+    body:
+      "Your internal cost per unit. NEVER printed in the proposal — used only to show your margin inline so you can quote with eyes on profit. Leave at 0 if you don't track per-line costs.",
+    example: "Selling at R 9 200 / m² with R 6 800 / m² cost shows a R 2 400 / m² margin.",
+  },
+  optional: {
+    id: "line.optional",
+    title: "Optional add-on",
+    body:
+      "Ticking this moves the line into a separate 'Optional Add-ons' table in the .docx. The amount is shown but NOT summed into the headline total — clients see it as an upsell they can choose to include.",
+  },
+};
 
 export default function LineEditor({
   lines,
@@ -13,10 +58,32 @@ export default function LineEditor({
   onChange: (next: Line[]) => void;
 }) {
   const [items, setItems] = useState<Item[]>([]);
+  const [picking, setPicking] = useState(false);
 
   useEffect(() => {
     api.items.list().then(setItems).catch(() => setItems([]));
   }, []);
+
+  const handlePicked = (picks: { item: Item; quantity: number }[]) => {
+    const next = [...lines];
+    for (const p of picks) {
+      next.push({
+        sequence: next.length,
+        item_code: p.item.code,
+        product_line: p.item.product_line,
+        structure_type: p.item.structure_type,
+        description: p.item.description || p.item.name,
+        quantity: p.quantity,
+        unit_of_measure: p.item.unit_of_measure,
+        unit_rate: p.item.default_rate,
+        discount_pct: 0,
+        is_optional: false,
+        cost_rate: 0,
+      });
+    }
+    onChange(next);
+    setPicking(false);
+  };
 
   const itemByName = (name: string) => items.find((i) => i.name === name);
 
@@ -95,25 +162,37 @@ export default function LineEditor({
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <div className="field-label">Line Items</div>
-        <button
-          onClick={add}
-          className="text-[10px] border border-sai-blue text-sai-blue px-2 py-0.5 rounded font-semibold hover:bg-sai-bluepale"
-        >
-          + Add line
-        </button>
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => setPicking(true)}
+            className="text-[10px] bg-sai-blue text-white px-2 py-0.5 rounded font-semibold hover:opacity-90"
+            title="Browse the catalogue with category and tag filters"
+          >
+            🗂️ Pick from catalogue
+          </button>
+          <button
+            onClick={add}
+            className="text-[10px] border border-sai-blue text-sai-blue px-2 py-0.5 rounded font-semibold hover:bg-sai-bluepale"
+          >
+            + Blank line
+          </button>
+        </div>
       </div>
+      {picking && (
+        <CataloguePicker onClose={() => setPicking(false)} onPick={handlePicked} />
+      )}
 
       <div className="border border-ui-border rounded-md overflow-x-auto scroll-thin">
         <div className="grid grid-cols-[minmax(220px,2fr)_minmax(150px,1.2fr)_minmax(130px,1fr)_60px_70px_80px_56px_72px_44px_90px_24px] gap-x-1 bg-slate-50 border-b border-ui-border px-2 py-1 text-[9px] uppercase tracking-wider font-semibold text-slate-500">
           <div>Item / Description</div>
           <div>Product Line</div>
           <div>Structure</div>
-          <div className="text-right">Qty</div>
-          <div>UoM</div>
-          <div className="text-right">Unit Rate</div>
-          <div className="text-right" title="Discount percentage">Disc %</div>
-          <div className="text-right" title="Internal cost (not shown to client)">Cost</div>
-          <div className="text-center" title="Mark as an optional add-on (won't be summed into total)">Opt.</div>
+          <div className="text-right flex items-center justify-end">Qty<HelpPopover help={HELP.quantity} /></div>
+          <div className="flex items-center">UoM<HelpPopover help={HELP.uom} /></div>
+          <div className="text-right flex items-center justify-end">Unit Rate<HelpPopover help={HELP.unit_rate} /></div>
+          <div className="text-right flex items-center justify-end">Disc<HelpPopover help={HELP.discount} /></div>
+          <div className="text-right flex items-center justify-end">Cost<HelpPopover help={HELP.cost} /></div>
+          <div className="text-center flex items-center justify-center">Opt.<HelpPopover help={HELP.optional} /></div>
           <div className="text-right">Line Total</div>
           <div />
         </div>
