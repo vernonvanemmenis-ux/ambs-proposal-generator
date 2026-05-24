@@ -337,6 +337,24 @@ class Attachment(Base):
     task: Mapped[Task] = relationship(back_populates="attachments")
 
 
+class PageLayout(Base):
+    """Studio mode — per-page block layout.
+
+    One row per customisable page (page_key = 'pipeline', 'opportunity_form',
+    'clients', etc). `blocks_json` is an ordered JSON array of
+        {"key": "<block_key>", "enabled": bool, "config": {...}}
+    The frontend's PageRenderer walks this list and renders each block from
+    the page-scoped component registry. Rows that don't yet exist resolve
+    to a code-defined default at GET time so the table can stay empty until
+    the user customises a page.
+    """
+    __tablename__ = "page_layouts"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    page_key: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    blocks_json: Mapped[str] = mapped_column(Text, default="[]")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class OpportunityAsset(Base):
     """Per-opportunity uploaded files used by the Appendix section.
 

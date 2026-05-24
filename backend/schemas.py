@@ -387,6 +387,24 @@ class TemplateOut(TemplateBase):
     created_at: datetime
 
 
+class PageLayoutBlock(BaseModel):
+    """One entry in a page's block list."""
+    key: str
+    enabled: bool = True
+    config: dict = {}
+
+
+class PageLayoutOut(BaseModel):
+    """Studio mode — what the frontend reads to render a customisable page."""
+    page_key: str
+    blocks: list[PageLayoutBlock] = []
+    updated_at: datetime | None = None
+
+
+class PageLayoutUpdate(BaseModel):
+    blocks: list[PageLayoutBlock]
+
+
 class StatusOut(BaseModel):
     online: bool
     pandadoc_configured: bool
