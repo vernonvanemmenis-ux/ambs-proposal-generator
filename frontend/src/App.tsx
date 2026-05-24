@@ -13,6 +13,7 @@ import ProjectBoard from "./pages/ProjectBoard";
 import OpportunityTemplates from "./pages/OpportunityTemplates";
 import Salespeople from "./pages/Salespeople";
 import Sales from "./pages/Sales";
+import CustomPage from "./pages/CustomPage";
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/opportunity-templates" element={<OpportunityTemplates />} />
           <Route path="/hr" element={<Salespeople />} />
           <Route path="/sales" element={<Sales />} />
+          <Route path="/p/:slug" element={<CustomPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>

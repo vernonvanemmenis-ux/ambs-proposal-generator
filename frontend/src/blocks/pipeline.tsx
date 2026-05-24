@@ -51,7 +51,13 @@ export type PipelineCtx = {
   onCardClick: (o: OppCard) => void;
 };
 
-type BlockProps = { ctx: PipelineCtx; config: Record<string, any> };
+// Pipeline blocks don't expose user-editable config yet, but the
+// PageRenderer contract requires setConfig — accept and ignore it.
+type BlockProps = {
+  ctx: PipelineCtx;
+  config: Record<string, any>;
+  setConfig: (next: Record<string, any>) => void;
+};
 
 
 function StatTile({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {

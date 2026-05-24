@@ -8,11 +8,18 @@
  *
  * No drag-and-drop yet — keyboard-friendly ↑/↓ buttons match the section-
  * card pattern already used in TemplateEditor.tsx (Studio plan §3).
+ *
+ * For custom:<slug> pages (Phase A.5) the footer also shows a "Delete
+ * this page" link that removes the underlying tile and cascades to wipe
+ * the page_layouts row.
  */
 
 import { useEffect, useState } from "react";
-import { api, type BlockRegistryMeta, type PageLayoutBlock, type PageRegistry } from "../api";
+import { api, type BlockRegistryMeta, type CustomTile, type PageLayoutBlock, type PageRegistry } from "../api";
 import RightDrawer, { DrawerCloseButton } from "./RightDrawer";
+
+
+const CUSTOM_PREFIX = "custom:";
 
 
 type Props = {
@@ -20,23 +27,42 @@ type Props = {
   onClose: () => void;
   // Fires after a successful save or reset so the host page can refresh.
   onSaved: () => void;
+  // Fires after a successful tile deletion on a custom page so the host
+  // can navigate away (the page key no longer exists).
+  onPageDeleted?: () => void;
 };
 
 
-export default function EditPageDrawer({ pageKey, onClose, onSaved }: Props) {
+export default function EditPageDrawer({ pageKey, onClose, onSaved, onPageDeleted }: Props) {
   const [registry, setRegistry] = useState<Record<string, BlockRegistryMeta> | null>(null);
   const [blocks, setBlocks] = useState<PageLayoutBlock[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [tile, setTile] = useState<CustomTile | null>(null);
+
+  const isCustom = pageKey.startsWith(CUSTOM_PREFIX);
+  const customSlug = isCustom ? pageKey.slice(CUSTOM_PREFIX.length) : "";
 
   useEffect(() => {
     Promise.all([api.layouts.registry(), api.layouts.get(pageKey)])
       .then(([reg, layout]: [PageRegistry, { blocks: PageLayoutBlock[] }]) => {
-        setRegistry(reg[pageKey] || {});
+        // For custom:<slug> pages the registry entry lives under the
+        // shared "custom" key, not the prefixed runtime key.
+        const regKey = isCustom ? "custom" : pageKey;
+        setRegistry(reg[regKey] || {});
         setBlocks(layout.blocks);
       })
       .catch((e: Error) => alert("Could not load page editor: " + e.message));
-  }, [pageKey]);
+  }, [pageKey, isCustom]);
+
+  // Resolve the CustomTile id by slug so the delete button can hit
+  // /api/tiles/<id>. Loaded lazily — built-in pages never trigger this.
+  useEffect(() => {
+    if (!isCustom) return;
+    api.tiles.list()
+      .then((tiles) => setTile(tiles.find((t) => t.slug === customSlug) ?? null))
+      .catch(() => {});
+  }, [isCustom, customSlug]);
 
   const toggle = (i: number) => {
     setBlocks((bs) => bs && bs.map((b, idx) => (idx === i ? { ...b, enabled: !b.enabled } : b)));
@@ -80,6 +106,23 @@ export default function EditPageDrawer({ pageKey, onClose, onSaved }: Props) {
       onSaved();
     } catch (e: any) {
       alert("Reset failed: " + (e?.message || e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deletePage = async () => {
+    if (!tile) {
+      alert("Could not find this tile.");
+      return;
+    }
+    if (!confirm(`Delete the "${tile.label}" tile and its page? This cannot be undone.`)) return;
+    setBusy(true);
+    try {
+      await api.tiles.delete(tile.id);
+      onPageDeleted?.();
+    } catch (e: any) {
+      alert("Delete failed: " + (e?.message || e));
     } finally {
       setBusy(false);
     }
@@ -159,7 +202,17 @@ export default function EditPageDrawer({ pageKey, onClose, onSaved }: Props) {
         )}
       </div>
 
-      <div className="px-5 py-3 border-t border-ui-border flex items-center gap-2">
+      <div className="px-5 py-3 border-t border-ui-border flex items-center gap-2 flex-wrap">
+        {isCustom && (
+          <button
+            onClick={deletePage}
+            disabled={busy || !tile}
+            className="text-[11px] text-red-600 hover:text-red-700 underline disabled:opacity-40"
+            title={tile ? "Delete this tile and its page" : "Loading tile…"}
+          >
+            Delete this page
+          </button>
+        )}
         <button
           onClick={reset}
           disabled={busy}
