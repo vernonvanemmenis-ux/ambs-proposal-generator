@@ -355,6 +355,23 @@ class PageLayout(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class CustomTile(Base):
+    """Studio mode — user-defined launcher tile.
+
+    Click → /p/<slug> → PageRenderer reads a `page_layouts` row keyed
+    "custom:<slug>" and renders the generic block set (heading / notes /
+    links). Deleting the tile cascades to wipe the matching page_layouts row.
+    """
+    __tablename__ = "custom_tiles"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    slug: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    label: Mapped[str] = mapped_column(String(120))
+    icon: Mapped[str] = mapped_column(String(20), default="🧩")
+    color: Mapped[str] = mapped_column(String(20), default="#64748b")
+    sequence: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class OpportunityAsset(Base):
     """Per-opportunity uploaded files used by the Appendix section.
 

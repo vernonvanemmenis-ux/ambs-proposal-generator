@@ -14,7 +14,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from ..blocks import PAGE_BLOCKS, default_layout
+from ..blocks import PAGE_BLOCKS, default_layout, get_page_blocks, is_valid_page
 from ..db import get_db
 from ..models import PageLayout
 from ..schemas import PageLayoutBlock, PageLayoutOut, PageLayoutUpdate
@@ -34,7 +34,8 @@ def _to_out(row: PageLayout | None, page_key: str, blocks: list[dict]) -> PageLa
 def _normalise_blocks(page_key: str, saved: list) -> list[dict]:
     """Drop unknown block keys, append registered blocks missing from the
     saved layout. Returns a fresh list in display order."""
-    valid_keys = set(PAGE_BLOCKS[page_key].keys())
+    template = get_page_blocks(page_key) or {}
+    valid_keys = set(template.keys())
     clean: list[dict] = []
     seen: set[str] = set()
     for b in saved:
@@ -49,7 +50,7 @@ def _normalise_blocks(page_key: str, saved: list) -> list[dict]:
             "config": dict(b.get("config") or {}),
         })
         seen.add(key)
-    for key, meta in PAGE_BLOCKS[page_key].items():
+    for key, meta in template.items():
         if key not in seen:
             clean.append({"key": key, "enabled": bool(meta.get("default_enabled", True)), "config": {}})
     return clean
@@ -64,7 +65,7 @@ def get_registry():
 
 @router.get("/{page_key}", response_model=PageLayoutOut)
 def get_layout(page_key: str, db: Session = Depends(get_db)):
-    if page_key not in PAGE_BLOCKS:
+    if not is_valid_page(page_key):
         raise HTTPException(404, f"Unknown page_key: {page_key}")
     row = db.query(PageLayout).filter(PageLayout.page_key == page_key).first()
     if row is None:
@@ -80,7 +81,7 @@ def get_layout(page_key: str, db: Session = Depends(get_db)):
 
 @router.put("/{page_key}", response_model=PageLayoutOut)
 def update_layout(page_key: str, payload: PageLayoutUpdate, db: Session = Depends(get_db)):
-    if page_key not in PAGE_BLOCKS:
+    if not is_valid_page(page_key):
         raise HTTPException(404, f"Unknown page_key: {page_key}")
     blocks = _normalise_blocks(page_key, [b.model_dump() for b in payload.blocks])
     row = db.query(PageLayout).filter(PageLayout.page_key == page_key).first()
@@ -101,7 +102,7 @@ def reset_layout(page_key: str, db: Session = Depends(get_db)):
     Used by the "Reset to defaults" button in the page editor drawer
     (Studio §7 Q2 — empty-state placeholder triggers this).
     """
-    if page_key not in PAGE_BLOCKS:
+    if not is_valid_page(page_key):
         raise HTTPException(404, f"Unknown page_key: {page_key}")
     row = db.query(PageLayout).filter(PageLayout.page_key == page_key).first()
     if row is not None:

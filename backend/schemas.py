@@ -405,6 +405,39 @@ class PageLayoutUpdate(BaseModel):
     blocks: list[PageLayoutBlock]
 
 
+# ---------------- Studio — custom launcher tiles ----------------
+class CustomTileIn(BaseModel):
+    """Payload for creating a user-defined launcher tile.
+
+    `slug` is optional — server derives it from `label` when missing or
+    blank, and adds a numeric suffix on collision.
+    """
+    label: str
+    icon: str = "🧩"
+    color: str = "#64748b"
+    slug: str = ""
+    sequence: int = 0
+
+
+class CustomTileOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    slug: str
+    label: str
+    icon: str
+    color: str
+    sequence: int
+    created_at: datetime
+
+
+class CustomTileUpdate(BaseModel):
+    label: str | None = None
+    icon: str | None = None
+    color: str | None = None
+    slug: str | None = None
+    sequence: int | None = None
+
+
 class StatusOut(BaseModel):
     online: bool
     pandadoc_configured: bool

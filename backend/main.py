@@ -34,6 +34,7 @@ from .routers import (
     clients,
     database,
     items,
+    launcher_tiles,
     layouts,
     opp_assets,
     opportunities,
@@ -86,6 +87,7 @@ app.include_router(salespeople.router)
 app.include_router(opp_assets.router)
 app.include_router(ai_draft.router)
 app.include_router(layouts.router)
+app.include_router(launcher_tiles.router)
 
 # Brand assets (logos) — accessible at /static/*
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
