@@ -1,42 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, type Catalogue, type Client, type Opportunity, type OpportunityLineDraft, type OpportunityTemplate } from "../api";
 import LineEditor from "../components/LineEditor";
-import KanbanBoard, { type KanbanColumn } from "../components/KanbanBoard";
 import RightDrawer, { DrawerCloseButton } from "../components/RightDrawer";
-
-const STAGES: KanbanColumn[] = [
-  { id: "new",       label: "New",            color: "#94a3b8" },
-  { id: "qualified", label: "Qualified",      color: "#3b82f6" },
-  { id: "proposal",  label: "Proposal Sent",  color: "#8b5cf6" },
-  { id: "won",       label: "Won",            color: "#10b981" },
-  { id: "lost",      label: "Lost",           color: "#ef4444" },
-];
-
-function money(v: number) {
-  return "R " + v.toLocaleString("en-ZA", { maximumFractionDigits: 0 });
-}
-
-function initialsOf(name: string): string {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((s) => s[0]!.toUpperCase())
-    .join("");
-}
-
-function isExpired(validUntil: string | null): boolean {
-  if (!validUntil) return false;
-  const d = new Date(validUntil);
-  if (Number.isNaN(d.getTime())) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return d < today;
-}
+import PageRenderer from "../components/PageRenderer";
+import { pipelineRegistry, type PipelineCtx } from "../blocks/pipeline";
 
 type OppCard = Opportunity & { columnId: string };
 
+/**
+ * The Pipeline page owns its data (opps, the kanban move/click handlers,
+ * and the New Opportunity drawer chrome). The body content — smart stats,
+ * tip strip, kanban — is rendered by the Studio block pipeline so users
+ * can toggle / reorder them in the page editor drawer (commit v).
+ */
 export default function Pipeline() {
   const [opps, setOpps] = useState<Opportunity[]>([]);
   const [creating, setCreating] = useState(false);
@@ -46,20 +23,7 @@ export default function Pipeline() {
     api.opportunities.list().then(setOpps).catch(() => {});
   }, []);
 
-  const columns = useMemo<KanbanColumn[]>(() => {
-    return STAGES.map((s) => {
-      const inCol = opps.filter((o) => o.stage === s.id);
-      const total = inCol.reduce((a, b) => a + b.amount, 0);
-      return { ...s, meta: `${inCol.length} · ${money(total)}` };
-    });
-  }, [opps]);
-
-  const items = useMemo<OppCard[]>(
-    () => opps.map((o) => ({ ...o, columnId: o.stage })),
-    [opps]
-  );
-
-  const move = async (o: OppCard, newStage: string | number) => {
+  const onMove = async (o: OppCard, newStage: string | number) => {
     const stage = String(newStage);
     if (o.stage === stage) return;
     setOpps((xs) => xs.map((x) => (x.id === o.id ? { ...x, stage } : x)));
@@ -75,54 +39,9 @@ export default function Pipeline() {
     }
   };
 
-  const renderCard = (o: OppCard) => {
-    const topPL = o.lines[0]?.product_line ?? "";
-    const expired = isExpired(o.valid_until);
-    return (
-      <div className="kanban-card relative">
-        {o.stage === "won" && <div className="ribbon">Won</div>}
-        <div className="text-[13px] font-semibold text-sai-navy leading-tight pr-12">
-          {o.title}
-        </div>
-        <div className="text-[11px] text-slate-500 mt-0.5">{o.client?.name}</div>
-        <div className="text-[11px] text-slate-400">
-          {o.lines.length} line item{o.lines.length === 1 ? "" : "s"}
-          {topPL ? ` · ${topPL}` : ""}
-        </div>
-        <div className="mt-2 flex items-center justify-between">
-          <div className="text-[12px] font-bold text-sai-blue">{money(o.amount)}</div>
-          <div className="star-row">
-            {[1, 2, 3].map((n) => (
-              <span key={n} className={`star ${o.priority >= n ? "is-on" : ""}`}>★</span>
-            ))}
-          </div>
-        </div>
-        <div className="mt-2 flex items-center gap-1 flex-wrap">
-          {expired && (
-            <span className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-semibold">
-              Expired
-            </span>
-          )}
-          {o.salesperson && (
-            <span
-              title={`Salesperson: ${o.salesperson}`}
-              className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-semibold"
-            >
-              {initialsOf(o.salesperson)}
-            </span>
-          )}
-          {o.project_id && (
-            <span
-              title="Has a construction project"
-              className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-semibold"
-            >
-              Project
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  };
+  const onCardClick = (o: OppCard) => nav(`/proposals/${o.id}`);
+
+  const ctx: PipelineCtx = { opps, onMove, onCardClick };
 
   return (
     <div className="min-h-[calc(100vh-44px)]">
@@ -145,17 +64,10 @@ export default function Pipeline() {
         </button>
       </div>
 
-      <div className="px-4 pt-2 text-[10px] text-slate-400 italic">
-        Tip: drag cards between columns to change stage. Moving to <span className="font-semibold text-emerald-600">Won</span> auto-creates a construction project.
-      </div>
-
-      <KanbanBoard<OppCard>
-        columns={columns}
-        items={items}
-        renderCard={renderCard}
-        onMove={move}
-        onCardClick={(o) => nav(`/proposals/${o.id}`)}
-        emptyHint="No opportunities in this stage"
+      <PageRenderer<PipelineCtx>
+        pageKey="pipeline"
+        registry={pipelineRegistry}
+        ctx={ctx}
       />
 
       {creating && (
