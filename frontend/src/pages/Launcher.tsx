@@ -1,6 +1,6 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { api, type DatabaseInfo, type Status } from "../api";
+import { api, type CustomTile, type DatabaseInfo, type Status } from "../api";
 
 type Tile = {
   id: string;
@@ -23,6 +23,14 @@ const TILES: Tile[] = [
   { id: "hr",        label: "HR",        color: "#0ea5e9", icon: "👥", href: "/hr" },
 ];
 
+const PALETTE = [
+  "#2563B0", "#4A90D9", "#10b981", "#8b5cf6",
+  "#f59e0b", "#06b6d4", "#ec4899", "#0ea5e9",
+  "#ef4444", "#64748b",
+];
+
+const ICON_SUGGESTIONS = ["🧩", "📋", "🗂️", "🛠️", "📊", "📁", "💡", "🚚", "🏭", "🔧"];
+
 function prettyBytes(n: number) {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
@@ -33,10 +41,14 @@ export default function Launcher() {
   const [status, setStatus] = useState<Status | null>(null);
   const [dbInfo, setDbInfo] = useState<DatabaseInfo | null>(null);
   const [copied, setCopied] = useState(false);
+  const [tiles, setTiles] = useState<CustomTile[]>([]);
+  const [adding, setAdding] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     api.status().then(setStatus).catch(() => {});
     api.database.info().then(setDbInfo).catch(() => {});
+    api.tiles.list().then(setTiles).catch(() => {});
   }, []);
 
   const copyPath = async () => {
@@ -51,6 +63,12 @@ export default function Launcher() {
   const openFolder = async () => {
     try { await api.database.openFolder(); }
     catch (e: any) { alert("Could not open folder: " + (e?.message || e)); }
+  };
+
+  const handleCreated = (tile: CustomTile) => {
+    setTiles((ts) => [...ts, tile]);
+    setAdding(false);
+    navigate(`/p/${tile.slug}`);
   };
 
   return (
@@ -105,6 +123,33 @@ export default function Launcher() {
             if (isBlocked || !t.href) return <div key={t.id}>{inner}</div>;
             return <Link key={t.id} to={t.href}>{inner}</Link>;
           })}
+
+          {tiles.map((t) => (
+            <Link key={`custom-${t.id}`} to={`/p/${t.slug}`}>
+              <div
+                className="relative aspect-square rounded-xl flex flex-col items-center justify-center gap-2 text-white shadow-card transition hover:-translate-y-0.5 hover:shadow-kanban"
+                style={{ background: t.color }}
+              >
+                <div className="text-3xl">{t.icon}</div>
+                <div className="text-[13px] font-semibold font-display tracking-wide text-center px-2 truncate max-w-full">
+                  {t.label}
+                </div>
+                <div className="absolute top-1.5 right-2 text-[9px] uppercase tracking-wider bg-black/30 px-1.5 py-0.5 rounded">
+                  Custom
+                </div>
+              </div>
+            </Link>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="relative aspect-square rounded-xl border-2 border-dashed border-slate-300 bg-white/50 text-slate-500 flex flex-col items-center justify-center gap-2 transition hover:border-sai-blue hover:text-sai-blue hover:bg-white"
+            aria-label="Add a custom tile"
+          >
+            <div className="text-3xl leading-none">+</div>
+            <div className="text-[12px] font-semibold tracking-wide">Add tile</div>
+          </button>
         </div>
 
         {/* Status summary */}
@@ -174,6 +219,165 @@ export default function Launcher() {
           )}
         </div>
       </div>
+
+      {adding && (
+        <AddTileModal
+          onClose={() => setAdding(false)}
+          onCreated={handleCreated}
+        />
+      )}
+    </div>
+  );
+}
+
+
+type AddTileModalProps = {
+  onClose: () => void;
+  onCreated: (tile: CustomTile) => void;
+};
+
+function AddTileModal({ onClose, onCreated }: AddTileModalProps) {
+  const [label, setLabel] = useState("");
+  const [icon, setIcon] = useState("🧩");
+  const [color, setColor] = useState(PALETTE[0]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const tile = await api.tiles.create({ label: trimmed, icon, color });
+      onCreated(tile);
+    } catch (e: any) {
+      setErr(e?.message || String(e));
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-40 bg-black/40 flex items-center justify-center px-4"
+      onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <form
+        onSubmit={submit}
+        className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden"
+      >
+        <div className="px-5 py-3 border-b border-ui-border flex items-center justify-between">
+          <div className="text-[14px] font-display font-bold text-sai-navy">Add a custom tile</div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-700 text-[18px] leading-none"
+            aria-label="Close"
+          >×</button>
+        </div>
+        <div className="px-5 py-4 space-y-4">
+          <div>
+            <label className="block text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-1">
+              Label
+            </label>
+            <input
+              autoFocus
+              type="text"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="e.g. Vendors"
+              className="w-full border border-ui-border rounded px-3 py-1.5 text-[13px] focus:outline-none focus:border-sai-blue"
+            />
+            <div className="text-[10px] text-slate-400 mt-1">
+              We'll derive a URL slug from this — collisions get a numeric suffix.
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-1">
+              Icon
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={icon}
+                onChange={(e) => setIcon(e.target.value.slice(0, 4))}
+                className="w-16 border border-ui-border rounded px-2 py-1.5 text-[18px] text-center focus:outline-none focus:border-sai-blue"
+              />
+              <div className="flex flex-wrap gap-1">
+                {ICON_SUGGESTIONS.map((i) => (
+                  <button
+                    type="button"
+                    key={i}
+                    onClick={() => setIcon(i)}
+                    className={`w-8 h-8 rounded text-[16px] border transition ${
+                      icon === i ? "border-sai-blue bg-blue-50" : "border-ui-border hover:bg-slate-50"
+                    }`}
+                  >
+                    {i}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="block text-[11px] uppercase tracking-wider text-slate-500 font-semibold mb-1">
+              Colour
+            </label>
+            <div className="flex items-center gap-2 flex-wrap">
+              {PALETTE.map((c) => (
+                <button
+                  type="button"
+                  key={c}
+                  onClick={() => setColor(c)}
+                  className={`w-7 h-7 rounded-full transition ${
+                    color === c ? "ring-2 ring-offset-2 ring-sai-navy" : "hover:scale-110"
+                  }`}
+                  style={{ background: c }}
+                  aria-label={c}
+                />
+              ))}
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="w-7 h-7 rounded cursor-pointer border border-ui-border"
+                title="Custom colour"
+              />
+            </div>
+          </div>
+          <div className="bg-slate-50 border border-ui-border rounded px-3 py-2 flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-md flex items-center justify-center text-white text-[20px] flex-shrink-0"
+              style={{ background: color }}
+            >
+              {icon}
+            </div>
+            <div className="text-[12px] text-slate-600">
+              <div className="font-semibold text-sai-navy">{label.trim() || "Preview"}</div>
+              <div className="text-[10px] text-slate-400">Tile preview</div>
+            </div>
+          </div>
+          {err && <div className="text-[11px] text-red-600">{err}</div>}
+        </div>
+        <div className="px-5 py-3 border-t border-ui-border flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="text-[12px] px-3 py-1.5 text-slate-500 hover:text-slate-800 disabled:opacity-40"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={!label.trim() || busy}
+            className="text-[12px] bg-sai-blue text-white px-4 py-1.5 rounded font-semibold hover:opacity-90 disabled:opacity-40"
+          >
+            {busy ? "Creating…" : "Create"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

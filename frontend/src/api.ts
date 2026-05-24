@@ -289,6 +289,26 @@ export type Salesperson = {
   created_at: string;
 };
 
+// Studio mode — user-defined launcher tile. Clicking one navigates to
+// /p/<slug>, which renders <PageRenderer pageKey={`custom:${slug}`} />.
+export type CustomTile = {
+  id: number;
+  slug: string;
+  label: string;
+  icon: string;
+  color: string;
+  sequence: number;
+  created_at: string;
+};
+
+export type CustomTileDraft = {
+  label: string;
+  icon?: string;
+  color?: string;
+  slug?: string;
+  sequence?: number;
+};
+
 export const api = {
   status: (): Promise<Status> => fetch("/api/status").then(j),
   catalogue: (): Promise<Catalogue> => fetch("/api/catalogue").then(j),
@@ -304,6 +324,23 @@ export const api = {
       }).then(j),
     reset: (pageKey: string): Promise<PageLayout> =>
       fetch(`/api/layouts/${encodeURIComponent(pageKey)}/reset`, { method: "POST" }).then(j),
+  },
+  tiles: {
+    list: (): Promise<CustomTile[]> => fetch("/api/tiles").then(j),
+    create: (body: CustomTileDraft): Promise<CustomTile> =>
+      fetch("/api/tiles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    update: (id: number, body: Partial<CustomTileDraft>): Promise<CustomTile> =>
+      fetch(`/api/tiles/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    delete: (id: number): Promise<{ ok: true }> =>
+      fetch(`/api/tiles/${id}`, { method: "DELETE" }).then(j),
   },
   salespeople: {
     list: (includeInactive = false): Promise<Salesperson[]> =>
