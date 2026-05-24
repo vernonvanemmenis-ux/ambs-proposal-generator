@@ -19,6 +19,8 @@ from pathlib import Path
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from docx.shared import Pt, RGBColor, Cm
 from sqlalchemy.orm import Session
 
@@ -103,7 +105,15 @@ def _substitute(text: str, ctx: dict) -> str:
 
 # --------------------------------------------------------------------- blocks
 def _add_heading(doc, text: str, size: int, color: RGBColor):
-    p = doc.add_paragraph()
+    """Section heading paragraph styled as Word's Heading 1.
+
+    Applying the built-in "Heading 1" style is what makes Word's TOC field
+    discover the paragraph. Visual styling (size, colour, bold) is overridden
+    at the run level so the AMBS aesthetic survives the style assignment.
+    """
+    p = doc.add_paragraph(style="Heading 1")
+    p.paragraph_format.space_before = Pt(8)
+    p.paragraph_format.space_after = Pt(2)
     r = p.add_run(text)
     r.bold = True
     r.font.size = Pt(size)
@@ -497,22 +507,79 @@ def _render_hero(doc, section, opp, tpl, accent):
     doc.add_paragraph()
 
 
-def _render_toc(doc, section, ctx, accent):
-    """Static (non-field) table of contents.
+def _add_toc_field(doc, fallback_lines: list[str]):
+    """Insert a real Word TOC field that picks up Heading-1 paragraphs.
 
-    A Word TOC FIELD requires the user to right-click → Update Field on first
-    open which is bad UX for a one-shot proposal. We walk the section list
-    that `generate_proposal_docx` stashed in ctx and emit a simple numbered
-    list. Sections without a meaningful title (page breaks, the TOC itself,
-    hero images) are skipped.
+    Field instruction: ``TOC \\o "1-1" \\h \\z \\u``
+        ``\\o "1-1"``  include heading levels 1..1
+        ``\\h``        each entry is a hyperlink to its heading
+        ``\\z``        hide tab leaders in web layout view
+        ``\\u``        also use paragraph outline level (defensive)
+
+    The ``separator`` half of the field holds a pre-computed static list as
+    the cached placeholder. Word/LibreOffice show that text until the field
+    is refreshed — which we trigger automatically via
+    ``_set_update_fields_on_open()``. Viewers that ignore the auto-update
+    setting still see the readable numbered list.
+    """
+    p = doc.add_paragraph()
+    run = p.add_run()
+    r_elem = run._r
+
+    fld_begin = OxmlElement("w:fldChar")
+    fld_begin.set(qn("w:fldCharType"), "begin")
+    r_elem.append(fld_begin)
+
+    instr = OxmlElement("w:instrText")
+    instr.set(qn("xml:space"), "preserve")
+    instr.text = 'TOC \\o "1-1" \\h \\z \\u'
+    r_elem.append(instr)
+
+    fld_sep = OxmlElement("w:fldChar")
+    fld_sep.set(qn("w:fldCharType"), "separate")
+    r_elem.append(fld_sep)
+
+    # Cached placeholder — readable as-is if the user dismisses the
+    # update prompt or opens the docx in a viewer without field support.
+    for i, line in enumerate(fallback_lines):
+        if i > 0:
+            br = OxmlElement("w:br")
+            r_elem.append(br)
+        t = OxmlElement("w:t")
+        t.set(qn("xml:space"), "preserve")
+        t.text = line
+        r_elem.append(t)
+
+    fld_end = OxmlElement("w:fldChar")
+    fld_end.set(qn("w:fldCharType"), "end")
+    r_elem.append(fld_end)
+
+
+def _render_toc(doc, section, ctx, accent):
+    """Real Word TOC field — auto-updates on open, headings are hyperlinks.
+
+    The "Contents" title itself is a plain bold paragraph (not Heading 1) so
+    the TOC doesn't list itself. Every other section heading uses
+    ``_add_heading``, which applies Heading 1 style; the TOC field picks
+    them up and renders them as clickable links.
+
+    For viewers that don't auto-update fields, ``_add_toc_field`` stuffs a
+    static numbered list into the field's cached value so the document is
+    still readable as-is.
     """
     sections = ctx.get("_sections") or []
     cfg = section.get("config", {})
-    _add_heading(doc, cfg.get("heading", "Contents"), 12, accent)
+
+    # Plain bold heading — NOT styled as Heading 1, to keep the TOC out of itself.
+    title_para = doc.add_paragraph()
+    title_run = title_para.add_run(cfg.get("heading", "Contents"))
+    title_run.bold = True
+    title_run.font.size = Pt(12)
+    title_run.font.color.rgb = accent
 
     skip_kinds = {"toc", "page_break", "hero"}
     defaults = {
-        "header": "Header",
+        "header": "",          # The brand header isn't a section heading; omit.
         "client_info": "Prepared For",
         "text": "",
         "scope": "Scope of Work",
@@ -527,6 +594,7 @@ def _render_toc(doc, section, ctx, accent):
         "appendix": "Appendix",
         "signature": "Acceptance",
     }
+    fallback_lines: list[str] = []
     seen = 0
     for s in sections:
         if not s.get("enabled", True):
@@ -538,8 +606,29 @@ def _render_toc(doc, section, ctx, accent):
         if not title:
             continue
         seen += 1
-        _add_para(doc, f"{seen}.  {title}", size=10)
+        fallback_lines.append(f"{seen}.  {title}")
+
+    _add_toc_field(doc, fallback_lines)
     doc.add_paragraph()
+
+
+def _set_update_fields_on_open(doc):
+    """Write ``<w:updateFields w:val="true"/>`` to ``word/settings.xml``.
+
+    With this flag set, Word prompts the user to refresh fields on first
+    open. They click Yes and the TOC field populates from the document's
+    Heading 1 paragraphs — fully linked, page-numbered, no manual right-click.
+    LibreOffice honours the same flag.
+    """
+    settings = doc.settings.element
+    tag = qn("w:updateFields")
+    existing = settings.find(tag)
+    if existing is None:
+        elem = OxmlElement("w:updateFields")
+        elem.set(qn("w:val"), "true")
+        settings.append(elem)
+    else:
+        existing.set(qn("w:val"), "true")
 
 
 def _render_image_gallery(doc, section, opp, accent):
@@ -781,6 +870,9 @@ def generate_proposal_docx(opportunity, filepath: Path, ref: str, template: Prop
             _add_small(doc, f"[Error rendering {kind} section: {e}]")
 
     _add_small(doc, f"Generated by SolutionsAI Proposal Generator · Template: {template.name} · {ctx['date']}")
+
+    # Tells Word/LibreOffice to refresh fields (incl. the TOC) on open.
+    _set_update_fields_on_open(doc)
 
     filepath.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(filepath))
