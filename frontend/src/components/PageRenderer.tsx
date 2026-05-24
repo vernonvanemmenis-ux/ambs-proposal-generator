@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from "react";
 import { api, type PageLayout, type PageLayoutBlock } from "../api";
+import EditPageDrawer from "./EditPageDrawer";
 
 type BlockComponent<C> = (props: { ctx: C; config: Record<string, any> }) => JSX.Element | null;
 
@@ -19,14 +20,18 @@ type Props<C> = {
   pageKey: string;
   registry: Record<string, BlockComponent<C>>;
   ctx: C;
-  // Bumping this value forces a layout refetch; the EditPageDrawer uses
-  // it to refresh the page after saving without prop-drilling state.
+  // Bumping this value forces a layout refetch; callers can use it to
+  // force a refresh from outside (e.g. after a related page event).
   refreshNonce?: number;
 };
 
 export default function PageRenderer<C>({ pageKey, registry, ctx, refreshNonce }: Props<C>) {
   const [layout, setLayout] = useState<PageLayout | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  // Internal counter bumped on save/reset from the editor drawer, so the
+  // useEffect below re-runs and pulls fresh layout state.
+  const [internalNonce, setInternalNonce] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,41 +40,69 @@ export default function PageRenderer<C>({ pageKey, registry, ctx, refreshNonce }
       .then((l) => { if (!cancelled) setLayout(l); })
       .catch((e: Error) => { if (!cancelled) setError(e.message); });
     return () => { cancelled = true; };
-  }, [pageKey, refreshNonce]);
+  }, [pageKey, refreshNonce, internalNonce]);
 
-  if (error) {
+  const body = (() => {
+    if (error) {
+      return (
+        <div className="px-4 py-6 text-[12px] text-red-600">
+          Could not load page layout: {error}
+        </div>
+      );
+    }
+    if (!layout) {
+      // Render nothing while loading — the page chrome above is already
+      // visible, so flashing a spinner inside the body would be more
+      // distracting than the brief empty space.
+      return null;
+    }
+    const enabled = layout.blocks.filter((b) => b.enabled);
+    if (enabled.length === 0) {
+      return <EmptyPagePlaceholder pageKey={pageKey} onReset={() => {
+        api.layouts.reset(pageKey).then(setLayout);
+      }} />;
+    }
     return (
-      <div className="px-4 py-6 text-[12px] text-red-600">
-        Could not load page layout: {error}
-      </div>
+      <>
+        {enabled.map((b: PageLayoutBlock) => {
+          const Block = registry[b.key];
+          if (!Block) {
+            // Block registered server-side but not yet implemented in the
+            // frontend bundle — fail soft, render nothing.
+            return null;
+          }
+          return <Block key={b.key} ctx={ctx} config={b.config} />;
+        })}
+      </>
     );
-  }
-  if (!layout) {
-    // Render nothing while loading — the page chrome above is already
-    // visible, so flashing a spinner inside the body would be more
-    // distracting than the brief empty space.
-    return null;
-  }
-
-  const enabled = layout.blocks.filter((b) => b.enabled);
-  if (enabled.length === 0) {
-    return <EmptyPagePlaceholder pageKey={pageKey} onReset={() => {
-      api.layouts.reset(pageKey).then(setLayout);
-    }} />;
-  }
+  })();
 
   return (
     <>
-      {enabled.map((b: PageLayoutBlock) => {
-        const Block = registry[b.key];
-        if (!Block) {
-          // Block registered server-side but not yet implemented in the
-          // frontend bundle — fail soft, render nothing.
-          return null;
-        }
-        return <Block key={b.key} ctx={ctx} config={b.config} />;
-      })}
+      {body}
+      <EditPageButton onOpen={() => setDrawerOpen(true)} />
+      {drawerOpen && (
+        <EditPageDrawer
+          pageKey={pageKey}
+          onClose={() => setDrawerOpen(false)}
+          onSaved={() => setInternalNonce((n) => n + 1)}
+        />
+      )}
     </>
+  );
+}
+
+
+function EditPageButton({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button
+      onClick={onOpen}
+      title="Edit page layout — toggle blocks, reorder, reset to defaults"
+      className="fixed bottom-4 right-4 z-30 w-11 h-11 rounded-full bg-sai-navy text-white text-[18px] shadow-lg hover:bg-sai-blue transition-colors flex items-center justify-center"
+      aria-label="Edit page layout"
+    >
+      ⚙
+    </button>
   );
 }
 
