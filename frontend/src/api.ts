@@ -256,6 +256,28 @@ async function j(res: Response): Promise<any> {
   return res.json();
 }
 
+// --------------- Studio mode — Page layouts ---------------
+export type BlockRegistryMeta = {
+  label: string;
+  description: string;
+  default_enabled: boolean;
+};
+
+// Outer key: page_key, inner key: block_key.
+export type PageRegistry = Record<string, Record<string, BlockRegistryMeta>>;
+
+export type PageLayoutBlock = {
+  key: string;
+  enabled: boolean;
+  config: Record<string, any>;
+};
+
+export type PageLayout = {
+  page_key: string;
+  blocks: PageLayoutBlock[];
+  updated_at: string | null;
+};
+
 export type Salesperson = {
   id: number;
   name: string;
@@ -270,6 +292,19 @@ export type Salesperson = {
 export const api = {
   status: (): Promise<Status> => fetch("/api/status").then(j),
   catalogue: (): Promise<Catalogue> => fetch("/api/catalogue").then(j),
+  layouts: {
+    registry: (): Promise<PageRegistry> => fetch("/api/layouts/registry").then(j),
+    get: (pageKey: string): Promise<PageLayout> =>
+      fetch(`/api/layouts/${encodeURIComponent(pageKey)}`).then(j),
+    update: (pageKey: string, blocks: PageLayoutBlock[]): Promise<PageLayout> =>
+      fetch(`/api/layouts/${encodeURIComponent(pageKey)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blocks }),
+      }).then(j),
+    reset: (pageKey: string): Promise<PageLayout> =>
+      fetch(`/api/layouts/${encodeURIComponent(pageKey)}/reset`, { method: "POST" }).then(j),
+  },
   salespeople: {
     list: (includeInactive = false): Promise<Salesperson[]> =>
       fetch(`/api/salespeople${includeInactive ? "?include_inactive=true" : ""}`).then(j),
