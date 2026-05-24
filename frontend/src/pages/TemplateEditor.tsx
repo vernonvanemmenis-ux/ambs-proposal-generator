@@ -5,12 +5,20 @@ import TemplatePreview from "../components/TemplatePreview";
 
 const KIND_LABELS: Record<string, string> = {
   header: "Header (brand bar + title)",
+  hero: "Hero Image (full-width banner)",
+  toc: "Table of Contents (static text)",
   client_info: "Client Info (auto-filled table)",
   text: "Text Block (free text, supports {{variables}})",
   scope: "Scope of Work (bullets + auto-lines)",
   line_items: "Line Items Table (auto-generated)",
+  image_gallery: "Image Gallery (line-item photos)",
   commercial: "Commercial Summary (auto-totals)",
   why_us: "Why Us (bullet list)",
+  risks: "Risks & Mitigations (table)",
+  warranty: "Warranty (paste-back enabled)",
+  site_logistics: "Site & Logistics (paste-back enabled)",
+  compliance: "Company Information & Compliance",
+  appendix: "Appendix (drawings & supporting docs)",
   signature: "Signature Block",
   page_break: "Page Break",
 };
@@ -21,12 +29,20 @@ const VAR_HELP =
 function defaultConfig(kind: string): Record<string, any> {
   switch (kind) {
     case "header": return { title: "PROJECT PROPOSAL", show_reference: true };
+    case "hero": return { heading: "" };
+    case "toc": return { heading: "Contents" };
     case "client_info": return { heading: "Prepared For" };
-    case "text": return { heading: "New Section", body: "Write some text here. You can use {{variables}} like {{client.name}}." };
+    case "text": return { heading: "New Section", paste_key: "", body: "Write some text here. You can use {{variables}} like {{client.name}}." };
     case "scope": return { heading: "Scope of Work", auto_include_lines: true, items: [] };
     case "line_items": return { heading: "Line Items" };
+    case "image_gallery": return { heading: "Module Gallery" };
     case "commercial": return { heading: "Commercial Summary", vat_percent: 15, payment_terms: "40% deposit · 40% on delivery · 20% on handover", validity_days: 30 };
     case "why_us": return { heading: "Why Us", bullets: [] };
+    case "risks": return { heading: "Risks & Mitigations" };
+    case "warranty": return { heading: "Warranty", paste_key: "warranty" };
+    case "site_logistics": return { heading: "Site & Logistics", paste_key: "site_logistics" };
+    case "compliance": return { heading: "Company Information & Compliance" };
+    case "appendix": return { heading: "Appendix — Drawings & Supporting Documents" };
     case "signature": return { heading: "Acceptance", preface: "Acceptance of this proposal may be indicated by signature below and an official purchase order.", client_label: "Signed for the Client", company_label: "Signed for Company" };
     case "page_break": return {};
     default: return {};
@@ -43,7 +59,9 @@ export default function TemplateEditor() {
   const [dirty, setDirty] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingHero, setUploadingHero] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const heroInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     api.templates.get(tid).then((t) => { setTpl(t); setDirty(false); });
@@ -109,6 +127,24 @@ export default function TemplateEditor() {
   const clearLogo = async () => {
     if (!confirm("Remove this logo?")) return;
     const updated = await api.templates.clearLogo(tpl.id);
+    setTpl(updated);
+  };
+
+  const uploadHero = async (file: File) => {
+    setUploadingHero(true);
+    try {
+      const updated = await api.templates.uploadHero(tpl.id, file);
+      setTpl(updated);
+    } catch (e: any) {
+      alert("Hero upload failed: " + (e?.message || e));
+    } finally {
+      setUploadingHero(false);
+    }
+  };
+
+  const clearHero = async () => {
+    if (!confirm("Remove this hero image?")) return;
+    const updated = await api.templates.clearHero(tpl.id);
     setTpl(updated);
   };
 
@@ -217,6 +253,118 @@ export default function TemplateEditor() {
               </label>
             </Field>
           </div>
+        </div>
+
+        {/* Hero image (v0.4.1) */}
+        <div className="bg-white border border-ui-border rounded-md p-5 space-y-3">
+          <div className="font-display font-bold text-sai-navy">Hero Image</div>
+          <div className="text-[11px] text-slate-500">
+            Rendered by the “Hero” section near the top of every generated proposal.
+            Per-opportunity overrides win when set.
+          </div>
+          <div className="flex items-start gap-4">
+            {tpl.hero_filename ? (
+              <img
+                src={api.templates.heroUrl(tpl.id)}
+                alt="Hero"
+                className="h-32 w-auto max-w-[280px] object-contain border border-ui-border rounded bg-white p-1"
+              />
+            ) : (
+              <div className="h-32 w-[280px] border border-dashed border-ui-border rounded text-[11px] text-slate-400 flex items-center justify-center italic bg-slate-50">
+                no hero image
+              </div>
+            )}
+            <div className="flex flex-col gap-1">
+              <button
+                onClick={() => heroInputRef.current?.click()}
+                disabled={uploadingHero}
+                className="text-[11px] bg-sai-blue text-white px-2 py-1 rounded font-semibold hover:opacity-90 disabled:opacity-40"
+              >
+                {uploadingHero ? "Uploading…" : tpl.hero_filename ? "Replace…" : "Upload…"}
+              </button>
+              {tpl.hero_filename && (
+                <button
+                  onClick={clearHero}
+                  className="text-[11px] border border-ui-border text-slate-600 px-2 py-1 rounded font-semibold hover:bg-slate-50"
+                >
+                  Remove
+                </button>
+              )}
+              <div className="text-[10px] text-slate-400 mt-1 max-w-[180px]">
+                PNG, JPG or JPEG — max 8 MB. Sized to ~16 cm wide in the docx.
+              </div>
+            </div>
+            <input
+              ref={heroInputRef}
+              type="file"
+              accept="image/png,image/jpeg"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) uploadHero(f);
+                if (heroInputRef.current) heroInputRef.current.value = "";
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Tax / Compliance (v0.4.1) */}
+        <div className="bg-white border border-ui-border rounded-md p-5 space-y-3">
+          <div className="font-display font-bold text-sai-navy">Company Information & Compliance</div>
+          <div className="text-[11px] text-slate-500">
+            Rendered by the “Compliance” section. Leave blank to hide that row.
+            Template-level only — no per-opportunity override.
+          </div>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+            <Field label="Company Registration">
+              <input className="field-value" value={tpl.tax_company_reg ?? ""} onChange={(e) => patch({ tax_company_reg: e.target.value })} />
+            </Field>
+            <Field label="VAT Number">
+              <input className="field-value" value={tpl.tax_vat_number ?? ""} onChange={(e) => patch({ tax_vat_number: e.target.value })} />
+            </Field>
+            <Field label="B-BBEE Level">
+              <input className="field-value" value={tpl.tax_bbbee_level ?? ""} onChange={(e) => patch({ tax_bbbee_level: e.target.value })} />
+            </Field>
+            <Field label="B-BBEE Cert Expiry">
+              <input className="field-value" value={tpl.tax_bbbee_cert_expiry ?? ""} placeholder="YYYY-MM-DD or free text" onChange={(e) => patch({ tax_bbbee_cert_expiry: e.target.value })} />
+            </Field>
+            <Field label="Registered Address">
+              <input className="field-value" value={tpl.tax_address ?? ""} onChange={(e) => patch({ tax_address: e.target.value })} />
+            </Field>
+            <Field label="Directors">
+              <input className="field-value" value={tpl.tax_directors ?? ""} onChange={(e) => patch({ tax_directors: e.target.value })} />
+            </Field>
+          </div>
+        </div>
+
+        {/* Default content (v0.4.1) */}
+        <div className="bg-white border border-ui-border rounded-md p-5 space-y-3">
+          <div className="font-display font-bold text-sai-navy">Section Defaults</div>
+          <div className="text-[11px] text-slate-500">
+            Boilerplate used by the Warranty, Site & Logistics, and Risks sections when an
+            opportunity doesn't override them. Per-opportunity overrides — and any per-section
+            paste-back — win at render time.
+          </div>
+          <Field label="Default Warranty">
+            <textarea
+              className="field-value min-h-[100px] resize-y"
+              value={tpl.default_warranty_md ?? ""}
+              onChange={(e) => patch({ default_warranty_md: e.target.value })}
+              placeholder="Warranty terms — blank paragraphs become paragraph breaks in the docx."
+            />
+          </Field>
+          <Field label="Default Site & Logistics">
+            <textarea
+              className="field-value min-h-[100px] resize-y"
+              value={tpl.default_site_logistics_md ?? ""}
+              onChange={(e) => patch({ default_site_logistics_md: e.target.value })}
+              placeholder="Site access requirements, what the client needs to provide, etc."
+            />
+          </Field>
+          <RisksJsonEditor
+            value={tpl.default_risks_json ?? "[]"}
+            onChange={(v) => patch({ default_risks_json: v })}
+          />
         </div>
 
         {/* Sections */}
@@ -376,7 +524,52 @@ function SectionConfigForm({ kind, config, onChange }: { kind: string; config: R
     case "client_info":
       return (<div>{Text("heading", "Heading")}</div>);
     case "text":
-      return (<div className="space-y-3">{Text("heading", "Heading (optional)")}{Area("body", "Body (supports {{variables}})", "Write body text…")}</div>);
+      return (<div className="space-y-3">
+        {Text("heading", "Heading (optional)")}
+        {Text("paste_key", "Paste key (optional — set to enable per-opportunity paste-back)", "e.g. executive_summary")}
+        {Area("body", "Body (supports {{variables}})", "Write body text…")}
+      </div>);
+    case "hero":
+      return (<div className="text-[11px] text-slate-500 italic">
+        Uses the template hero image (configured above), or the per-opportunity hero override when set.
+      </div>);
+    case "toc":
+      return (<div>{Text("heading", "Heading")}</div>);
+    case "image_gallery":
+      return (<div className="space-y-2">
+        {Text("heading", "Heading")}
+        <div className="text-[11px] text-slate-500 italic">
+          Auto-renders a 2-column grid of every line item's catalogue image. Section is skipped when no line items have images.
+        </div>
+      </div>);
+    case "risks":
+      return (<div className="space-y-2">
+        {Text("heading", "Heading")}
+        <div className="text-[11px] text-slate-500 italic">
+          Renders the default risks table from this template, or the per-opportunity override when non-empty.
+        </div>
+      </div>);
+    case "warranty":
+    case "site_logistics":
+      return (<div className="space-y-2">
+        {Text("heading", "Heading")}
+        {Text("paste_key", "Paste key (optional — for per-opportunity drafts)", kind === "warranty" ? "warranty" : "site_logistics")}
+        {Area("body", "Fallback body (optional — used only when template & opp defaults are blank)", "Leave blank to fall back to the template default.")}
+      </div>);
+    case "compliance":
+      return (<div className="space-y-2">
+        {Text("heading", "Heading")}
+        <div className="text-[11px] text-slate-500 italic">
+          Renders the company-information & compliance fields configured above.
+        </div>
+      </div>);
+    case "appendix":
+      return (<div className="space-y-2">
+        {Text("heading", "Heading")}
+        <div className="text-[11px] text-slate-500 italic">
+          Renders files attached to each opportunity. Images embed inline; other types are listed by filename. Section is skipped when no files are attached.
+        </div>
+      </div>);
     case "scope":
       return (<div className="space-y-3">
         {Text("heading", "Heading")}
@@ -416,6 +609,98 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div>
       <div className="field-label">{label}</div>
       {children}
+    </div>
+  );
+}
+
+type RiskRowDraft = { risk: string; likelihood: string; impact: string; mitigation: string };
+
+function RisksJsonEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  // Visual editor for the risks JSON array. Falls back to a raw textarea when
+  // the value can't be parsed so users aren't locked out of fixing bad data.
+  let parsed: RiskRowDraft[] | null = null;
+  try {
+    const raw = JSON.parse(value || "[]");
+    if (Array.isArray(raw)) {
+      parsed = raw.map((r) => ({
+        risk: String(r?.risk ?? ""),
+        likelihood: String(r?.likelihood ?? "Medium"),
+        impact: String(r?.impact ?? "Medium"),
+        mitigation: String(r?.mitigation ?? ""),
+      }));
+    }
+  } catch {
+    parsed = null;
+  }
+
+  const commit = (rows: RiskRowDraft[]) => onChange(JSON.stringify(rows));
+
+  if (parsed === null) {
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <div className="field-label mb-0">Default Risks (raw JSON — couldn't parse)</div>
+          <button
+            onClick={() => commit([])}
+            className="text-[10px] border border-ui-border text-slate-600 px-2 py-0.5 rounded font-semibold hover:bg-slate-50"
+          >
+            Reset to empty list
+          </button>
+        </div>
+        <textarea
+          className="field-value min-h-[120px] resize-y font-mono"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <div className="field-label mb-0">Default Risks</div>
+        <button
+          onClick={() => commit([...parsed!, { risk: "", likelihood: "Medium", impact: "Medium", mitigation: "" }])}
+          className="text-[10px] border border-sai-blue text-sai-blue px-2 py-0.5 rounded font-semibold hover:bg-sai-bluepale"
+        >
+          + Add risk
+        </button>
+      </div>
+      <div className="space-y-2">
+        {parsed.length === 0 && <div className="text-[11px] text-slate-400 italic">No risks yet — add one above.</div>}
+        {parsed.map((row, i) => {
+          const update = (p: Partial<RiskRowDraft>) => {
+            const next = parsed!.slice();
+            next[i] = { ...next[i], ...p };
+            commit(next);
+          };
+          const remove = () => commit(parsed!.filter((_, j) => j !== i));
+          return (
+            <div key={i} className="grid grid-cols-[1fr_100px_100px_1fr_24px] gap-2 items-start">
+              <textarea
+                className="field-value min-h-[42px] resize-y"
+                placeholder="Risk description"
+                value={row.risk}
+                onChange={(e) => update({ risk: e.target.value })}
+              />
+              <select className="field-value" value={row.likelihood} onChange={(e) => update({ likelihood: e.target.value })}>
+                <option>Low</option><option>Medium</option><option>High</option>
+              </select>
+              <select className="field-value" value={row.impact} onChange={(e) => update({ impact: e.target.value })}>
+                <option>Low</option><option>Medium</option><option>High</option>
+              </select>
+              <textarea
+                className="field-value min-h-[42px] resize-y"
+                placeholder="Mitigation"
+                value={row.mitigation}
+                onChange={(e) => update({ mitigation: e.target.value })}
+              />
+              <button onClick={remove} title="Remove risk" className="text-slate-300 hover:text-red-500 text-[14px] leading-none mt-2">×</button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

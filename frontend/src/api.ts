@@ -25,6 +25,8 @@ export type OpportunityLine = {
   is_optional: boolean;
   cost_rate: number;
   margin?: number;
+  // Template-bundle grouping; "" means ungrouped.
+  bundle_label: string;
 };
 
 export type OpportunityLineDraft = Omit<OpportunityLine, "id" | "line_total" | "margin">;
@@ -40,6 +42,7 @@ export type Item = {
   default_rate: number;
   description: string;
   tags: string;
+  image_path: string;
 };
 
 export type TemplateLine = {
@@ -75,6 +78,23 @@ export type OpportunityLite = {
   client: { name: string };
 };
 
+export type OpportunityAsset = {
+  id: number;
+  filename: string;
+  content_type: string;
+  size_bytes: number;
+  caption: string;
+  sequence: number;
+  uploaded_at: string;
+};
+
+export type RiskRow = {
+  risk: string;
+  likelihood: "Low" | "Medium" | "High" | string;
+  impact: "Low" | "Medium" | "High" | string;
+  mitigation: string;
+};
+
 export type Opportunity = {
   id: number;
   title: string;
@@ -90,10 +110,17 @@ export type Opportunity = {
   project_id: number | null;
   client: Client;
   lines: OpportunityLine[];
+  assets: OpportunityAsset[];
   // Sales extras
   valid_until: string | null;
   salesperson: string;
   deposit_pct: number;
+  // v0.4.1 — overrides and paste-back drafts
+  hero_filename: string;
+  warranty_override: string;
+  site_logistics_override: string;
+  risks_override_json: string;
+  section_drafts_json: string;
 };
 
 export type Catalogue = {
@@ -123,8 +150,24 @@ export type Template = {
   brand_primary_color: string;
   brand_accent_color: string;
   logo_filename: string;
+  hero_filename: string;
+  default_warranty_md: string;
+  default_site_logistics_md: string;
+  default_risks_json: string;
+  tax_company_reg: string;
+  tax_vat_number: string;
+  tax_bbbee_level: string;
+  tax_bbbee_cert_expiry: string;
+  tax_address: string;
+  tax_directors: string;
   sections: TemplateSection[];
   created_at: string;
+};
+
+export type AIDraftStatus = {
+  configured: boolean;
+  provider: string;
+  model: string;
 };
 
 export type TemplateDraft = Omit<Template, "id" | "created_at"> & { id?: number };
@@ -213,9 +256,38 @@ async function j(res: Response): Promise<any> {
   return res.json();
 }
 
+export type Salesperson = {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  role: string;
+  initials: string;
+  active: boolean;
+  created_at: string;
+};
+
 export const api = {
   status: (): Promise<Status> => fetch("/api/status").then(j),
   catalogue: (): Promise<Catalogue> => fetch("/api/catalogue").then(j),
+  salespeople: {
+    list: (includeInactive = false): Promise<Salesperson[]> =>
+      fetch(`/api/salespeople${includeInactive ? "?include_inactive=true" : ""}`).then(j),
+    create: (body: Partial<Salesperson>): Promise<Salesperson> =>
+      fetch("/api/salespeople", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    update: (id: number, body: Partial<Salesperson>): Promise<Salesperson> =>
+      fetch(`/api/salespeople/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    delete: (id: number): Promise<{ ok: true; soft_deleted: true }> =>
+      fetch(`/api/salespeople/${id}`, { method: "DELETE" }).then(j),
+  },
   items: {
     list: (): Promise<Item[]> => fetch("/api/items").then(j),
     create: (body: Partial<Item>): Promise<Item> =>
@@ -232,6 +304,14 @@ export const api = {
       }).then(j),
     delete: (id: number): Promise<{ ok: true }> =>
       fetch(`/api/items/${id}`, { method: "DELETE" }).then(j),
+    uploadImage: (id: number, file: File): Promise<Item> => {
+      const fd = new FormData();
+      fd.append("file", file);
+      return fetch(`/api/items/${id}/image`, { method: "POST", body: fd }).then(j);
+    },
+    deleteImage: (id: number): Promise<Item> =>
+      fetch(`/api/items/${id}/image`, { method: "DELETE" }).then(j),
+    imageUrl: (id: number): string => `/api/items/${id}/image?t=${Date.now()}`,
   },
   database: {
     info: (): Promise<DatabaseInfo> => fetch("/api/database/info").then(j),
@@ -293,6 +373,44 @@ export const api = {
       }).then(j),
     deleteLine: (oppId: number, lineId: number): Promise<{ ok: true }> =>
       fetch(`/api/opportunities/${oppId}/lines/${lineId}`, { method: "DELETE" }).then(j),
+    uploadHero: (id: number, file: File): Promise<Opportunity> => {
+      const fd = new FormData();
+      fd.append("file", file);
+      return fetch(`/api/opportunities/${id}/hero`, { method: "POST", body: fd }).then(j);
+    },
+    clearHero: (id: number): Promise<Opportunity> =>
+      fetch(`/api/opportunities/${id}/hero`, { method: "DELETE" }).then(j),
+    heroUrl: (id: number): string => `/api/opportunities/${id}/hero?t=${Date.now()}`,
+    assets: {
+      list: (oppId: number): Promise<OpportunityAsset[]> =>
+        fetch(`/api/opportunities/${oppId}/assets`).then(j),
+      upload: (oppId: number, file: File, caption = ""): Promise<OpportunityAsset> => {
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("caption", caption);
+        return fetch(`/api/opportunities/${oppId}/assets`, { method: "POST", body: fd }).then(j);
+      },
+      update: (oppId: number, assetId: number, body: Partial<Pick<OpportunityAsset, "caption" | "sequence">>): Promise<OpportunityAsset> =>
+        fetch(`/api/opportunities/${oppId}/assets/${assetId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      delete: (oppId: number, assetId: number): Promise<{ ok: true }> =>
+        fetch(`/api/opportunities/${oppId}/assets/${assetId}`, { method: "DELETE" }).then(j),
+      downloadUrl: (oppId: number, assetId: number) =>
+        `/api/opportunities/${oppId}/assets/${assetId}/download`,
+    },
+  },
+
+  ai: {
+    draftStatus: (): Promise<AIDraftStatus> => fetch("/api/sections/draft/status").then(j),
+    draft: (prompt: string, paste_key = ""): Promise<{ text: string; provider: string; configured: boolean }> =>
+      fetch("/api/sections/draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt, paste_key }),
+      }).then(j),
   },
 
   proposals: {
@@ -437,5 +555,13 @@ export const api = {
     clearLogo: (id: number): Promise<Template> =>
       fetch(`/api/templates/${id}/logo/clear`, { method: "POST" }).then(j),
     logoUrl: (filename: string) => (filename ? `/logos/${filename}` : ""),
+    uploadHero: (id: number, file: File): Promise<Template> => {
+      const fd = new FormData();
+      fd.append("file", file);
+      return fetch(`/api/templates/${id}/hero`, { method: "POST", body: fd }).then(j);
+    },
+    clearHero: (id: number): Promise<Template> =>
+      fetch(`/api/templates/${id}/hero/clear`, { method: "POST" }).then(j),
+    heroUrl: (id: number): string => `/api/templates/${id}/hero?t=${Date.now()}`,
   },
 };

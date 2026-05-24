@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api, type Catalogue, type Client, type Opportunity, type OpportunityLineDraft, type OpportunityTemplate } from "../api";
 import LineEditor from "../components/LineEditor";
 import KanbanBoard, { type KanbanColumn } from "../components/KanbanBoard";
+import RightDrawer, { DrawerCloseButton } from "../components/RightDrawer";
 
 const STAGES: KanbanColumn[] = [
   { id: "new",       label: "New",            color: "#94a3b8" },
@@ -214,16 +215,26 @@ function NewOpportunityDrawer({
     api.opportunityTemplates.list().then(setOppTemplates).catch(() => setOppTemplates([]));
   }, []);
 
+  // Multiple templates can be picked into one opportunity. Each pick appends
+  // the template's lines as a fresh bundle (stamped with bundle_label = tpl.name)
+  // so they render under a module sub-heading in the editor and the .docx.
+  // First template wins for header fields — picks after the drawer already has
+  // lines only add their bundle, they don't overwrite the title/delivery/deposit.
   const applyTemplate = (tpl: OpportunityTemplate) => {
-    setHeader((h) => ({
-      ...h,
-      title: tpl.title_hint || tpl.name,
-      delivery_weeks: tpl.default_delivery_weeks,
-      deposit_pct: tpl.default_deposit_pct,
-    }));
-    setLines(
-      tpl.default_lines.map((ln, i) => ({
-        sequence: i,
+    setHeader((h) =>
+      lines.length === 0
+        ? {
+            ...h,
+            title: tpl.title_hint || tpl.name,
+            delivery_weeks: tpl.default_delivery_weeks,
+            deposit_pct: tpl.default_deposit_pct,
+          }
+        : h,
+    );
+    setLines((prev) => {
+      const base = prev.length;
+      const added = tpl.default_lines.map((ln, i) => ({
+        sequence: base + i,
         item_code: ln.item_code,
         product_line: ln.product_line,
         structure_type: ln.structure_type,
@@ -234,8 +245,10 @@ function NewOpportunityDrawer({
         discount_pct: 0,
         is_optional: ln.is_optional,
         cost_rate: 0,
-      }))
-    );
+        bundle_label: tpl.name,
+      }));
+      return [...prev, ...added];
+    });
   };
 
   const canSubmit =
@@ -272,16 +285,17 @@ function NewOpportunityDrawer({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 z-50 flex justify-end" onClick={onClose}>
-      <div
-        className="bg-white w-[780px] h-full shadow-2xl flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <RightDrawer
+      drawerKey="newopp"
+      defaultWidth={780}
+      minWidth={480}
+      closeOnBackdropClick={false}
+      onClose={onClose}
+    >
         <div className="px-5 py-3 border-b border-ui-border flex items-center">
           <div className="text-[14px] font-display font-bold text-sai-navy">New Opportunity</div>
           <div className="flex-1" />
-          <button onClick={onClose}
-                  className="text-slate-400 hover:text-slate-700 text-lg leading-none px-1">×</button>
+          <DrawerCloseButton onClose={onClose} />
         </div>
 
         <div className="flex-1 overflow-y-auto scroll-thin px-5 py-4 space-y-4">
@@ -306,7 +320,7 @@ function NewOpportunityDrawer({
                 ))}
               </div>
               <div className="text-[10px] text-slate-500 mt-2 italic">
-                Picks pre-fill the title, delivery, deposit, and line items. You can still edit everything below.
+                Pick more than one — each template's lines stay grouped as a bundle below. The first pick also sets the title, delivery and deposit.
               </div>
             </div>
           )}
@@ -408,8 +422,7 @@ function NewOpportunityDrawer({
             {busy ? "Creating…" : "Create & open"}
           </button>
         </div>
-      </div>
-    </div>
+    </RightDrawer>
   );
 }
 

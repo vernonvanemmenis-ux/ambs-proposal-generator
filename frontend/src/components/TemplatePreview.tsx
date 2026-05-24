@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, type Opportunity, type Template, type TemplateSection } from "../api";
+import RightDrawer, { DrawerCloseButton } from "./RightDrawer";
 
 const VAR_RE = /\{\{\s*([a-zA-Z_][\w\.]*)\s*\}\}/g;
 
@@ -97,11 +98,7 @@ export default function TemplatePreview({
   const ctx = useMemo(() => buildContext(template, opp), [template, opp]);
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex" onClick={onClose}>
-      <div
-        className="ml-auto bg-slate-200 w-full md:w-[900px] h-full shadow-2xl flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <RightDrawer drawerKey="template-preview" defaultWidth={900} minWidth={620} onClose={onClose}>
         <div className="px-4 py-2 bg-white border-b border-ui-border flex items-center gap-3">
           <div className="text-[13px] font-display font-bold text-sai-navy">Preview</div>
           <div className="text-slate-300">·</div>
@@ -120,16 +117,10 @@ export default function TemplatePreview({
               </option>
             ))}
           </select>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 text-[16px] leading-none px-2"
-            title="Close preview"
-          >
-            ×
-          </button>
+          <DrawerCloseButton onClose={onClose} />
         </div>
 
-        <div className="flex-1 overflow-y-auto scroll-thin p-6">
+        <div className="flex-1 overflow-y-auto scroll-thin p-6 bg-slate-200">
           <PaperSheet>
             {template.sections
               .filter((s) => s.enabled)
@@ -141,8 +132,7 @@ export default function TemplatePreview({
             </div>
           </PaperSheet>
         </div>
-      </div>
-    </div>
+    </RightDrawer>
   );
 }
 

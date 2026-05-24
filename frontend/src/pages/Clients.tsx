@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type Client, type Opportunity } from "../api";
+import RightDrawer, { DrawerCloseButton } from "../components/RightDrawer";
 
 type Draft = Partial<Client> & { id?: number };
 
@@ -139,25 +140,19 @@ export default function Clients() {
 
       {/* Edit drawer */}
       {editing && (
-        <div
-          className="fixed inset-0 bg-black/30 z-50 flex justify-end"
-          onClick={() => setEditing(null)}
+        <RightDrawer
+          drawerKey="client-editor"
+          defaultWidth={460}
+          minWidth={400}
+          closeOnBackdropClick={false}
+          onClose={() => setEditing(null)}
         >
-          <div
-            className="bg-white w-[460px] h-full shadow-2xl flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
             <div className="px-5 py-3 border-b border-ui-border flex items-center">
               <div className="text-[14px] font-display font-bold text-sai-navy">
                 {editing.id ? "Edit Client" : "New Client"}
               </div>
               <div className="flex-1" />
-              <button
-                onClick={() => setEditing(null)}
-                className="text-slate-400 hover:text-slate-700 text-lg leading-none px-1"
-              >
-                ×
-              </button>
+              <DrawerCloseButton onClose={() => setEditing(null)} />
             </div>
             <div className="flex-1 overflow-y-auto scroll-thin px-5 py-4 space-y-3">
               <DField label="Name" value={editing.name ?? ""} onChange={(v) => setEditing({ ...editing, name: v })} />
@@ -208,8 +203,7 @@ export default function Clients() {
                 {busy ? "Saving…" : editing.id ? "Save" : "Create"}
               </button>
             </div>
-          </div>
-        </div>
+        </RightDrawer>
       )}
     </div>
   );

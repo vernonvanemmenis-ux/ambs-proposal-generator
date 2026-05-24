@@ -350,11 +350,14 @@ DEFAULT_TEMPLATE_SECTIONS = [
         "title": "PROJECT PROPOSAL",
         "show_reference": True,
     }},
+    {"kind": "hero", "enabled": True, "config": {"heading": ""}},
+    {"kind": "toc", "enabled": True, "config": {"heading": "Contents"}},
     {"kind": "client_info", "enabled": True, "config": {
         "heading": "Prepared For",
     }},
     {"kind": "text", "enabled": True, "config": {
         "heading": "Executive Summary",
+        "paste_key": "executive_summary",
         "body": (
             "Thank you for the opportunity to propose on the {{opportunity.title}} for "
             "{{client.name}}. This proposal covers {{n_items}} line item(s) — "
@@ -375,6 +378,7 @@ DEFAULT_TEMPLATE_SECTIONS = [
         ],
     }},
     {"kind": "line_items", "enabled": True, "config": {"heading": "Line Items"}},
+    {"kind": "image_gallery", "enabled": True, "config": {"heading": "Module Gallery"}},
     {"kind": "commercial", "enabled": True, "config": {
         "heading": "Commercial Summary",
         "vat_percent": 15.0,
@@ -390,6 +394,17 @@ DEFAULT_TEMPLATE_SECTIONS = [
             "Referenced on Northam Platinum, Steve Biko Academic Hospital, Mopani, Kansanshi, and dozens more.",
         ],
     }},
+    {"kind": "risks", "enabled": True, "config": {"heading": "Risks & Mitigations"}},
+    {"kind": "warranty", "enabled": True, "config": {
+        "heading": "Warranty",
+        "paste_key": "warranty",
+    }},
+    {"kind": "site_logistics", "enabled": True, "config": {
+        "heading": "Site & Logistics",
+        "paste_key": "site_logistics",
+    }},
+    {"kind": "compliance", "enabled": True, "config": {"heading": "Company Information & Compliance"}},
+    {"kind": "appendix", "enabled": True, "config": {"heading": "Appendix — Drawings & Supporting Documents"}},
     {"kind": "signature", "enabled": True, "config": {
         "heading": "Acceptance",
         "preface": (
@@ -401,6 +416,136 @@ DEFAULT_TEMPLATE_SECTIONS = [
         "company_label": "Signed for AMBS",
     }},
 ]
+
+
+DEFAULT_WARRANTY_MD = (
+    "AMBS warrants every module against defects in materials and workmanship "
+    "for twelve (12) months from the date of handover. Structural panels "
+    "are covered for five (5) years against deformation under normal use.\n\n"
+    "The warranty excludes damage from acts of God, unauthorised modifications, "
+    "and wear-and-tear on fittings and finishes. Warranty claims must be raised "
+    "in writing within 14 days of the defect being noticed."
+)
+
+
+DEFAULT_SITE_LOGISTICS_MD = (
+    "Panels and components are manufactured in Stormill, Johannesburg and "
+    "transported to site under our delivery service. Standard offload requires "
+    "a level hardstand area of at least 12 × 6 m and access for an 18 m truck.\n\n"
+    "Client to provide: a secure staging area, water and 230 V single-phase "
+    "power for installation tools, and ablution facilities for the install crew. "
+    "Crane lifts (if applicable) are coordinated 5 working days ahead of arrival."
+)
+
+
+DEFAULT_RISKS = [
+    {"risk": "Site access delayed by weather or third-party works",
+     "likelihood": "Medium", "impact": "Medium",
+     "mitigation": "5-day weather lookahead; alternative offload date held in reserve."},
+    {"risk": "Crane unavailable on planned set-down day",
+     "likelihood": "Low", "impact": "High",
+     "mitigation": "Confirmed sub-contractor + backup rigger booked 2 weeks ahead."},
+    {"risk": "Scope creep beyond signed proposal",
+     "likelihood": "Medium", "impact": "Medium",
+     "mitigation": "Change requests go via written variation order before any work."},
+]
+
+
+# ---------------------------------------------------------------------------
+# v0.4.1 upgrade — bring already-deployed templates up to the new section set
+# without trashing the user's edits to existing sections.
+# ---------------------------------------------------------------------------
+def _v041_default_section(kind: str) -> dict:
+    """Return the canonical v0.4.1 section dict for `kind`, looked up from
+    DEFAULT_TEMPLATE_SECTIONS. Falls back to an enabled stub if the kind
+    isn't in the default list (shouldn't happen for v0.4.1 kinds)."""
+    for s in DEFAULT_TEMPLATE_SECTIONS:
+        if s["kind"] == kind:
+            # Deep-ish copy so callers can't mutate the module-level default.
+            return {"kind": s["kind"], "enabled": s["enabled"], "config": dict(s["config"])}
+    return {"kind": kind, "enabled": True, "config": {}}
+
+
+# Where each v0.4.1 section should land if it's missing from an old template.
+# Anchor names the section the new one should sit AFTER.
+_V041_INSERTION_ANCHORS: list[tuple[str, str]] = [
+    ("hero", "header"),
+    ("toc", "hero"),
+    ("image_gallery", "line_items"),
+    ("risks", "why_us"),
+    ("warranty", "risks"),
+    ("site_logistics", "warranty"),
+    ("compliance", "site_logistics"),
+    ("appendix", "compliance"),
+]
+
+
+def _insert_after(sections: list[dict], new_section: dict, anchor_kind: str) -> list[dict]:
+    """Return a new list with `new_section` placed after the first occurrence
+    of `anchor_kind`. If the anchor isn't present, falls back to inserting
+    before the first signature/page_break, or to the end."""
+    for i, s in enumerate(sections):
+        if s.get("kind") == anchor_kind:
+            return sections[: i + 1] + [new_section] + sections[i + 1 :]
+    for i, s in enumerate(sections):
+        if s.get("kind") in ("signature", "page_break"):
+            return sections[:i] + [new_section] + sections[i:]
+    return sections + [new_section]
+
+
+def _upgrade_existing_templates(db: Session) -> None:
+    """Idempotent in-place upgrade so already-deployed templates pick up the
+    v0.4.1 section kinds without manual editing. Runs every boot:
+      * For any template missing a v0.4.1 kind in sections_json, append it
+        at the sensible anchor (hero→header, toc→hero, image_gallery→line_items,
+        risks→why_us, warranty→risks, site_logistics→warranty,
+        compliance→site_logistics, appendix→compliance).
+      * Existing sections are left untouched — the user's text, headings,
+        and ordering for header/client_info/text/scope/line_items/commercial/
+        why_us/signature are preserved.
+      * Empty default_* content fields and "[]" risks JSON are back-filled
+        from the v0.4.1 defaults so the new sections actually render content.
+      * Tax fields on existing templates are NEVER overwritten — that's user
+        data, not stock content.
+    """
+    templates = db.query(ProposalTemplate).all()
+    for tpl in templates:
+        try:
+            sections: list[dict] = json.loads(tpl.sections_json or "[]")
+            if not isinstance(sections, list):
+                sections = []
+        except (ValueError, TypeError):
+            sections = []
+
+        present = {s.get("kind") for s in sections if isinstance(s, dict)}
+        changed = False
+
+        for kind, anchor in _V041_INSERTION_ANCHORS:
+            if kind not in present:
+                sections = _insert_after(sections, _v041_default_section(kind), anchor)
+                present.add(kind)
+                changed = True
+
+        if changed:
+            tpl.sections_json = json.dumps(sections)
+
+        if not (tpl.default_warranty_md or "").strip():
+            tpl.default_warranty_md = DEFAULT_WARRANTY_MD
+            changed = True
+        if not (tpl.default_site_logistics_md or "").strip():
+            tpl.default_site_logistics_md = DEFAULT_SITE_LOGISTICS_MD
+            changed = True
+        try:
+            risks = json.loads(tpl.default_risks_json or "[]")
+        except (ValueError, TypeError):
+            risks = []
+        if not isinstance(risks, list) or len(risks) == 0:
+            tpl.default_risks_json = json.dumps(DEFAULT_RISKS)
+            changed = True
+
+        if changed:
+            db.add(tpl)
+    db.commit()
 
 
 def seed():
@@ -450,10 +595,23 @@ def seed():
                 brand_primary_color="#2563B0",
                 brand_accent_color="#0B1120",
                 logo_filename=stock_logo,
+                default_warranty_md=DEFAULT_WARRANTY_MD,
+                default_site_logistics_md=DEFAULT_SITE_LOGISTICS_MD,
+                default_risks_json=json.dumps(DEFAULT_RISKS),
+                tax_company_reg="REG 1998/012345/07",
+                tax_vat_number="VAT 4123456789",
+                tax_bbbee_level="Level 2 Contributor",
+                tax_bbbee_cert_expiry="2027-03-31",
+                tax_address="Ext 5, African Park, 10-12 Jockey Street, Stormill, Johannesburg, 1709",
+                tax_directors="V. van Emmenis · J. Smith · M. Naidoo",
                 sections_json=json.dumps(DEFAULT_TEMPLATE_SECTIONS),
             )
             db.add(tpl)
             db.commit()
+
+        # v0.4.1: bring already-deployed templates up to the new section set.
+        # Runs every boot — idempotent. Preserves user edits to existing sections.
+        _upgrade_existing_templates(db)
 
         if db.query(Client).count() > 0:
             return

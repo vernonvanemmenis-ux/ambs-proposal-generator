@@ -59,25 +59,65 @@ Prerequisites:
 
 ## Publishing an update
 
-No reinstall is required — updates land as a new payload ZIP.
+No reinstall is required — updates land as a new payload ZIP. From 0.5.0
+onwards every manifest must carry an **Ed25519 signature** over the payload's
+SHA-256 digest; installs reject any manifest that fails verification.
 
 ```bash
-# Bump version inside backend/updater.py (APP_VERSION)
+# 1. Bump version inside backend/updater.py (APP_VERSION)
+# 2. Build the frontend and the payload zip
 npm --prefix frontend run build
-python build/publish_update.py 0.2.0 --notes "Added bulk proposal export"
+python build/publish_update.py 0.5.0 --notes "Added bulk proposal export"
+
+# 3. Sign the payload zip — produces a manifest.json next to it.
+python scripts/sign_release.py build/releases/0.5.0/payload-0.5.0.zip \
+    --version 0.5.0 \
+    --notes "Added bulk proposal export"
 ```
 
-Upload both files from `build/releases/0.2.0/` to your update host:
+Upload **both** files to your release host (GitHub Releases is the only host
+allow-listed by `backend/updater.py`):
 
 ```
-payload-0.2.0.zip   →  https://updates.solutionsai.co.za/ambs-proposal-gen/payload-0.2.0.zip
-manifest.json       →  https://updates.solutionsai.co.za/ambs-proposal-gen/manifest.json
+payload-0.5.0.zip   →  https://github.com/<owner>/<repo>/releases/download/v0.5.0/payload-0.5.0.zip
+manifest.json       →  https://github.com/<owner>/<repo>/releases/latest/download/manifest.json
 ```
 
-Installed apps poll the manifest on every launch (and every 60 s while open) and
-show a blue "Update available" banner. Clicking Apply downloads + verifies the
-SHA-256 + stages it for the next launch; if the new version crashes three times
-in a row, the launcher automatically rolls back to the previous payload.
+Manifest schema (signed):
+
+```jsonc
+{
+  "version":   "0.5.0",
+  "url":       "https://github.com/.../payload-0.5.0.zip",
+  "sha256":    "<lowercase hex>",
+  "signature": "<base64 Ed25519 sig over the ASCII sha256 hex>",
+  "notes":     "..."
+}
+```
+
+Installed apps poll the manifest on every launch (and every 60 s while open),
+verify the signature against `VERIFY_KEYS` in `backend/updater.py`, and only
+then show the blue "Update available" banner. Clicking **Apply**:
+
+1. Re-verifies the manifest signature (hard fail if invalid).
+2. Refuses any `url` that isn't HTTPS or whose host isn't in
+   `{github.com, objects.githubusercontent.com}`.
+3. Downloads the zip, checks SHA-256, extracts to `pending/`, writes the
+   `APPLY_ON_NEXT_BOOT` marker.
+
+On next launch the launcher swaps `pending → current`. If the new version
+crashes three times in a row, the launcher automatically rolls back.
+
+### Signing keys
+
+- Private key: `C:\Users\verno\Secrets\ambs_signing_key.bin` (32 raw bytes,
+  Ed25519). **Never commit.** Back this up offline — losing it means losing
+  the ability to ship signed updates under the current key.
+- Public keys: hard-coded in `backend/updater.py` as `VERIFY_KEYS:
+  tuple[bytes, ...]`. To rotate, generate a new keypair, append the new
+  public key to the tuple, and ship that as an update *signed with the old
+  key*. Once every installed copy has picked up the rotation, you can sign
+  subsequent releases with the new key.
 
 ### Update host
 

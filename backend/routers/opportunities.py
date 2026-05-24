@@ -1,8 +1,13 @@
-from fastapi import APIRouter, Depends, HTTPException
+import re
+import uuid
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
 from ..constants import DEFAULT_PROJECT_STAGES
-from ..db import get_db
+from ..db import OPP_HEROES_DIR, get_db
 from ..models import Opportunity, OpportunityLine, Activity, Project, ProjectStage, Task
 from ..schemas import (
     OpportunityCreate,
@@ -13,6 +18,14 @@ from ..schemas import (
     ActivityCreate,
     ActivityOut,
 )
+
+ALLOWED_HERO_EXTS = {".png", ".jpg", ".jpeg"}
+MAX_HERO_BYTES = 8 * 1024 * 1024
+_SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def _safe_filename(name: str) -> str:
+    return _SAFE_NAME_RE.sub("_", name).strip("._-") or "hero"
 
 router = APIRouter(prefix="/api/opportunities", tags=["opportunities"])
 
@@ -107,9 +120,65 @@ def delete_opportunity(opp_id: int, db: Session = Depends(get_db)):
     o = db.get(Opportunity, opp_id)
     if not o:
         raise HTTPException(404, "Opportunity not found")
+    # Best-effort cleanup of the opp's hero folder.
+    if o.hero_filename:
+        try:
+            (OPP_HEROES_DIR / str(o.id) / o.hero_filename).unlink(missing_ok=True)
+        except OSError:
+            pass
     db.delete(o)
     db.commit()
     return {"ok": True}
+
+
+# ---------------- Hero image ----------------
+@router.post("/{opp_id}/hero", response_model=OpportunityOut)
+async def upload_opp_hero(opp_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    o = db.get(Opportunity, opp_id)
+    if not o:
+        raise HTTPException(404, "Opportunity not found")
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in ALLOWED_HERO_EXTS:
+        raise HTTPException(400, f"Unsupported hero extension. Use one of: {sorted(ALLOWED_HERO_EXTS)}")
+    body = await file.read()
+    if len(body) > MAX_HERO_BYTES:
+        raise HTTPException(413, f"Hero too large (max {MAX_HERO_BYTES // (1024 * 1024)} MB).")
+    folder = OPP_HEROES_DIR / str(opp_id)
+    folder.mkdir(parents=True, exist_ok=True)
+    # Remove previous hero file(s) in the folder to avoid orphans.
+    if o.hero_filename:
+        (folder / o.hero_filename).unlink(missing_ok=True)
+    safe = _safe_filename(file.filename or "hero")
+    new_name = f"{uuid.uuid4().hex[:8]}_{safe}"
+    (folder / new_name).write_bytes(body)
+    o.hero_filename = new_name
+    db.commit()
+    db.refresh(o)
+    return o
+
+
+@router.delete("/{opp_id}/hero", response_model=OpportunityOut)
+def delete_opp_hero(opp_id: int, db: Session = Depends(get_db)):
+    o = db.get(Opportunity, opp_id)
+    if not o:
+        raise HTTPException(404, "Opportunity not found")
+    if o.hero_filename:
+        (OPP_HEROES_DIR / str(opp_id) / o.hero_filename).unlink(missing_ok=True)
+        o.hero_filename = ""
+        db.commit()
+        db.refresh(o)
+    return o
+
+
+@router.get("/{opp_id}/hero")
+def get_opp_hero(opp_id: int, db: Session = Depends(get_db)):
+    o = db.get(Opportunity, opp_id)
+    if not o or not o.hero_filename:
+        raise HTTPException(404, "No hero for this opportunity")
+    p = OPP_HEROES_DIR / str(opp_id) / o.hero_filename
+    if not p.exists():
+        raise HTTPException(410, "Hero missing on disk")
+    return FileResponse(p)
 
 
 # ---------------- Lines ----------------

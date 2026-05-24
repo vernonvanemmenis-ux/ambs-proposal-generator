@@ -79,6 +79,7 @@ export default function LineEditor({
         discount_pct: 0,
         is_optional: false,
         cost_rate: 0,
+        bundle_label: "",
       });
     }
     onChange(next);
@@ -126,8 +127,14 @@ export default function LineEditor({
         discount_pct: 0,
         is_optional: false,
         cost_rate: 0,
+        bundle_label: "",
       },
     ]);
+
+  const removeBundle = (label: string) =>
+    onChange(lines.filter((ln) => (ln.bundle_label || "") !== label));
+  const unbundle = (label: string) =>
+    onChange(lines.map((ln) => ((ln.bundle_label || "") === label ? { ...ln, bundle_label: "" } : ln)));
 
   const lineTotalOf = (ln: Line) => {
     const qty = Number(ln.quantity) || 0;
@@ -207,9 +214,44 @@ export default function LineEditor({
           const rowClass = ln.is_optional
             ? "bg-amber-50/40 hover:bg-amber-50"
             : "hover:bg-ui-rowhover";
+          // Render a bundle sub-header when the bundle_label transitions.
+          // Bundles must be contiguous in the lines array (the apply logic
+          // appends bundles, so this holds by construction).
+          const label = (ln.bundle_label || "").trim();
+          const prevLabel = i > 0 ? (lines[i - 1].bundle_label || "").trim() : null;
+          const showHeader = label && label !== prevLabel;
+          const bundleTotal = showHeader
+            ? lines
+                .filter((x) => (x.bundle_label || "").trim() === label)
+                .reduce((s, x) => s + lineTotalOf(x), 0)
+            : 0;
           return (
+            <div key={`grp-${i}`}>
+            {showHeader && (
+              <div className="flex items-center gap-2 bg-sai-bluepale/70 border-b border-sai-blue/30 px-2 py-1 text-[11px]">
+                <span className="text-sai-blue font-semibold">▸ {label}</span>
+                <span className="text-[10px] text-slate-500">bundle</span>
+                <div className="flex-1" />
+                <span className="text-[11px] font-semibold text-sai-blue tabular-nums">{money(bundleTotal)}</span>
+                <button
+                  type="button"
+                  onClick={() => unbundle(label)}
+                  title="Keep these lines but ungroup the bundle"
+                  className="text-[10px] text-slate-500 hover:text-sai-blue font-semibold px-1.5"
+                >
+                  ungroup
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeBundle(label)}
+                  title="Remove this entire bundle (all lines)"
+                  className="text-[10px] text-red-500 hover:text-red-700 font-semibold px-1.5"
+                >
+                  remove
+                </button>
+              </div>
+            )}
             <div
-              key={i}
               className={`grid grid-cols-[minmax(220px,2fr)_minmax(150px,1.2fr)_minmax(130px,1fr)_60px_70px_80px_56px_72px_44px_90px_24px] gap-x-1 items-center border-b border-ui-border last:border-0 px-2 py-1 text-[11px] ${rowClass}`}
             >
               <div className="flex flex-col gap-0.5">
@@ -268,10 +310,12 @@ export default function LineEditor({
               </select>
               <input
                 type="number"
-                step="0.01"
+                step={ln.unit_of_measure === "each" ? 1 : 0.01}
+                min={0}
                 className="line-input text-right"
                 value={ln.quantity}
                 onChange={(e) => update(i, { quantity: Number(e.target.value) || 0 })}
+                title={ln.unit_of_measure === "each" ? "Whole units only" : "Fractional quantity allowed"}
               />
               <select
                 className="line-input"
@@ -324,6 +368,7 @@ export default function LineEditor({
               >
                 ×
               </button>
+            </div>
             </div>
           );
         })}

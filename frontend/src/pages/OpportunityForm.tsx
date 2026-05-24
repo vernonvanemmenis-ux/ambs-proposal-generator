@@ -7,11 +7,15 @@ import {
   type Opportunity,
   type OpportunityLineDraft,
   type Proposal,
+  type Salesperson,
   type Status,
   type Template,
 } from "../api";
 import LineEditor from "../components/LineEditor";
 import HelpPopover from "../components/HelpPopover";
+import PromptBuilder from "../components/PromptBuilder";
+import OppHeroAndAssets from "../components/OppHeroAndAssets";
+import SectionDrafts from "../components/SectionDrafts";
 
 const FIELD_HELP = {
   salesperson: {
@@ -63,6 +67,7 @@ function toDraft(lines: Opportunity["lines"]): LineDraft[] {
     discount_pct: l.discount_pct ?? 0,
     is_optional: l.is_optional ?? false,
     cost_rate: l.cost_rate ?? 0,
+    bundle_label: l.bundle_label ?? "",
   }));
 }
 
@@ -95,6 +100,7 @@ export default function OpportunityForm() {
   const [lines, setLines] = useState<LineDraft[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
+  const [salespeople, setSalespeople] = useState<Salesperson[]>([]);
   const [newNote, setNewNote] = useState("");
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -118,6 +124,7 @@ export default function OpportunityForm() {
       const def = list.find((t) => t.is_default) ?? list[0];
       if (def) setSelectedTemplateId(def.id);
     }).catch(() => {});
+    api.salespeople.list().then(setSalespeople).catch(() => setSalespeople([]));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [oppId]);
 
@@ -161,6 +168,7 @@ export default function OpportunityForm() {
         discount_pct: Number(ln.discount_pct) || 0,
         is_optional: !!ln.is_optional,
         cost_rate: Number(ln.cost_rate) || 0,
+        bundle_label: ln.bundle_label ?? "",
       };
       if (ln.id) {
         await api.opportunities.updateLine(oppId, ln.id, payload);
@@ -340,12 +348,33 @@ export default function OpportunityForm() {
             </div>
           </Field>
           <Field label="Salesperson" help={<HelpPopover help={FIELD_HELP.salesperson} />}>
-            <input
-              className="field-value"
-              placeholder="e.g. Vernon van Emmenis"
-              value={opp.salesperson ?? ""}
-              onChange={(e) => updateHeader("salesperson", e.target.value)}
-            />
+            {(() => {
+              const current = opp.salesperson ?? "";
+              const knownNames = new Set(salespeople.map((s) => s.name));
+              const legacy = current && !knownNames.has(current) ? current : null;
+              return (
+                <select
+                  className="field-value"
+                  value={current}
+                  onChange={(e) => updateHeader("salesperson", e.target.value)}
+                >
+                  <option value="">— Unassigned —</option>
+                  {salespeople.map((s) => (
+                    <option key={s.id} value={s.name}>
+                      {s.name}{s.role ? ` · ${s.role}` : ""}
+                    </option>
+                  ))}
+                  {legacy && (
+                    <option value={legacy}>Other — {legacy}</option>
+                  )}
+                </select>
+              );
+            })()}
+            {salespeople.length === 0 && (
+              <div className="text-[10px] text-amber-600 mt-1">
+                No salespeople yet — add the team on the <Link to="/hr" className="underline">HR app</Link>.
+              </div>
+            )}
           </Field>
           <Field label="Quotation valid until" help={<HelpPopover help={FIELD_HELP.valid_until} />}>
             <input
@@ -444,6 +473,19 @@ export default function OpportunityForm() {
             </div>
           )}
         </div>
+
+        {/* Hero override + appendix uploads (v0.4.1) */}
+        <OppHeroAndAssets opp={opp} onChanged={(fresh) => setOpp(fresh)} />
+
+        {/* Per-section paste-back drafts (v0.4.1) */}
+        <SectionDrafts
+          opp={opp}
+          template={templates.find((t) => t.id === selectedTemplateId) ?? null}
+          onSaved={load}
+        />
+
+        {/* ChatGPT prompt builder */}
+        <PromptBuilder opp={opp} lines={lines} subtotal={lineSubtotal} />
 
         {/* Chatter */}
         <div className="bg-white border border-ui-border rounded-md">

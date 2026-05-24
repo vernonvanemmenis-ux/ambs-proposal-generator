@@ -35,6 +35,19 @@ class Opportunity(Base):
     salesperson: Mapped[str] = mapped_column(String(120), default="")
     deposit_pct: Mapped[float] = mapped_column(Float, default=0.0)
 
+    # Per-opportunity overrides for the template-level defaults. Empty string
+    # means "use the template default". Stored on the Opportunity (not the
+    # Proposal) so the user can iterate the docx without losing edits.
+    hero_filename: Mapped[str] = mapped_column(String(300), default="")  # file in DATA_ROOT/opp_heroes/{id}/
+    warranty_override: Mapped[str] = mapped_column(Text, default="")
+    site_logistics_override: Mapped[str] = mapped_column(Text, default="")
+    risks_override_json: Mapped[str] = mapped_column(Text, default="")  # "" means use template default
+    # Per-section paste-back store: {"<paste_key>": "<markdown body>"}.
+    # Section bodies with a non-empty draft win over the template's static body
+    # at render time. Filled by the user (or by the optional /api/sections/draft
+    # endpoint) and never auto-cleared.
+    section_drafts_json: Mapped[str] = mapped_column(Text, default="{}")
+
     client: Mapped[Client] = relationship(back_populates="opportunities")
     lines: Mapped[list["OpportunityLine"]] = relationship(
         back_populates="opportunity",
@@ -44,6 +57,11 @@ class Opportunity(Base):
     proposals: Mapped[list["Proposal"]] = relationship(back_populates="opportunity", cascade="all,delete")
     activities: Mapped[list["Activity"]] = relationship(back_populates="opportunity", cascade="all,delete")
     project: Mapped["Project | None"] = relationship(back_populates="opportunity", uselist=False, cascade="all,delete")
+    assets: Mapped[list["OpportunityAsset"]] = relationship(
+        back_populates="opportunity",
+        cascade="all,delete",
+        order_by="OpportunityAsset.uploaded_at",
+    )
 
     @property
     def amount(self) -> float:
@@ -78,6 +96,11 @@ class OpportunityLine(Base):
     is_optional: Mapped[bool] = mapped_column(Boolean, default=False)
     cost_rate: Mapped[float] = mapped_column(Float, default=0.0)  # internal margin tracking; never rendered
 
+    # Bundle grouping — set when a line came from an opportunity template; "" means ungrouped.
+    # Multiple templates can be applied to one opportunity; each application stamps its name
+    # here so the editor and proposal can render the lines under a module subheading.
+    bundle_label: Mapped[str] = mapped_column(String(120), default="")
+
     opportunity: Mapped[Opportunity] = relationship(back_populates="lines")
 
     @property
@@ -95,6 +118,24 @@ class OpportunityLine(Base):
             return 0.0
         qty = float(self.quantity or 0.0)
         return self.line_total - qty * cost
+
+
+class Salesperson(Base):
+    """AMBS sales team directory.
+
+    Used to populate the Salesperson dropdown on opportunities. Soft-deleted
+    via `active=False` so historical opportunities can still show the person
+    who originally owned them.
+    """
+    __tablename__ = "salespeople"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    email: Mapped[str] = mapped_column(String(200), default="")
+    phone: Mapped[str] = mapped_column(String(60), default="")
+    role: Mapped[str] = mapped_column(String(120), default="")
+    initials: Mapped[str] = mapped_column(String(8), default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class Item(Base):
@@ -116,6 +157,9 @@ class Item(Base):
     description: Mapped[str] = mapped_column(String(300), default="")
     # Comma-separated tags for the catalogue picker filter (e.g. "Modular,Mining,HVAC")
     tags: Mapped[str] = mapped_column(String(400), default="")
+    # Path (relative to DATA_ROOT/item_images/) to the canonical product photo.
+    # Empty string means no image — rendered with a placeholder in the UI.
+    image_path: Mapped[str] = mapped_column(String(400), default="")
 
 
 class OpportunityTemplate(Base):
@@ -158,6 +202,24 @@ class ProposalTemplate(Base):
     brand_primary_color: Mapped[str] = mapped_column(String(20), default="#2563B0")
     brand_accent_color: Mapped[str] = mapped_column(String(20), default="#0B1120")
     logo_filename: Mapped[str] = mapped_column(String(200), default="")  # file in data/logos/
+    hero_filename: Mapped[str] = mapped_column(String(200), default="")  # file in data/heroes/, used by the 'hero' section
+
+    # Default body content for the new structured sections. Per-opportunity
+    # overrides on the Opportunity model win at render time when non-empty.
+    default_warranty_md: Mapped[str] = mapped_column(Text, default="")
+    default_site_logistics_md: Mapped[str] = mapped_column(Text, default="")
+    # JSON array of {"risk": str, "likelihood": str, "impact": str, "mitigation": str}
+    default_risks_json: Mapped[str] = mapped_column(Text, default="[]")
+
+    # Tax / company-registration / B-BBEE block — structured fields rendered
+    # as a key-value table by the 'compliance' section. Template-only (no
+    # per-opportunity override; this rarely changes per deal).
+    tax_company_reg: Mapped[str] = mapped_column(String(120), default="")
+    tax_vat_number: Mapped[str] = mapped_column(String(120), default="")
+    tax_bbbee_level: Mapped[str] = mapped_column(String(40), default="")
+    tax_bbbee_cert_expiry: Mapped[str] = mapped_column(String(40), default="")  # ISO date or free text
+    tax_address: Mapped[str] = mapped_column(String(400), default="")
+    tax_directors: Mapped[str] = mapped_column(String(400), default="")
 
     # Ordered list of sections, each: {"kind": str, "enabled": bool, "config": {...}}
     sections_json: Mapped[str] = mapped_column(Text, default="[]")
@@ -273,3 +335,24 @@ class Attachment(Base):
     uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     task: Mapped[Task] = relationship(back_populates="attachments")
+
+
+class OpportunityAsset(Base):
+    """Per-opportunity uploaded files used by the Appendix section.
+
+    Images get embedded inline; other file types (PDF, DWG, DOCX) render as a
+    referenced filename in the appendix list. Caption is optional and rendered
+    next to the file when present.
+    """
+    __tablename__ = "opportunity_assets"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    opportunity_id: Mapped[int] = mapped_column(ForeignKey("opportunities.id"))
+    filename: Mapped[str] = mapped_column(String(300))
+    content_type: Mapped[str] = mapped_column(String(120), default="application/octet-stream")
+    size_bytes: Mapped[int] = mapped_column(Integer, default=0)
+    stored_path: Mapped[str] = mapped_column(String(600))
+    caption: Mapped[str] = mapped_column(String(400), default="")
+    sequence: Mapped[int] = mapped_column(Integer, default=0)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    opportunity: Mapped[Opportunity] = relationship(back_populates="assets")

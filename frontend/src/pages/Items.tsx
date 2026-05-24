@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, type Catalogue, type Item } from "../api";
+import RightDrawer, { DrawerCloseButton } from "../components/RightDrawer";
+import ImagePromptBuilder from "../components/ImagePromptBuilder";
 
 type Draft = Partial<Item> & { id?: number };
 
@@ -13,6 +15,13 @@ export default function Items() {
   const [cat, setCat] = useState<string>("");
   const [editing, setEditing] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
+  const [imgBusy, setImgBusy] = useState(false);
+  const [imgError, setImgError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [promptItem, setPromptItem] = useState<Item | null>(null);
+  // Bumped after each upload/delete so the thumbnail <img> refetches.
+  const [imageVersion, setImageVersion] = useState(0);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = () => api.items.list().then(setItems).catch(() => {});
   useEffect(() => {
@@ -68,6 +77,45 @@ export default function Items() {
     load();
   };
 
+  const uploadImage = async (file: File) => {
+    if (!editing?.id) return;
+    setImgBusy(true);
+    setImgError(null);
+    try {
+      const updated = await api.items.uploadImage(editing.id, file);
+      setEditing({ ...editing, image_path: updated.image_path });
+      setImageVersion((v) => v + 1);
+      load();
+    } catch (e: any) {
+      setImgError(e?.message || "Upload failed");
+    } finally {
+      setImgBusy(false);
+    }
+  };
+
+  const removeImage = async () => {
+    if (!editing?.id || !editing.image_path) return;
+    setImgBusy(true);
+    setImgError(null);
+    try {
+      const updated = await api.items.deleteImage(editing.id);
+      setEditing({ ...editing, image_path: updated.image_path });
+      setImageVersion((v) => v + 1);
+      load();
+    } catch (e: any) {
+      setImgError(e?.message || "Remove failed");
+    } finally {
+      setImgBusy(false);
+    }
+  };
+
+  const onDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) uploadImage(file);
+  };
+
   const money = (v: number) =>
     "R " + v.toLocaleString("en-ZA", { maximumFractionDigits: 2 });
 
@@ -75,6 +123,8 @@ export default function Items() {
     c === "Structure" ? "bg-blue-100 text-blue-700" :
     c === "Service" ? "bg-amber-100 text-amber-700" :
     "bg-emerald-100 text-emerald-700";
+
+  const thumbUrl = (i: Item) => i.image_path ? `/api/items/${i.id}/image?v=${imageVersion}` : null;
 
   return (
     <div className="min-h-[calc(100vh-44px)]">
@@ -110,6 +160,7 @@ export default function Items() {
           <table className="w-full text-[12px]">
             <thead className="bg-slate-50 border-b border-ui-border">
               <tr className="text-left text-[10px] uppercase tracking-wider text-slate-500">
+                <th className="px-3 py-2 font-semibold w-12"></th>
                 <th className="px-3 py-2 font-semibold">Code</th>
                 <th className="px-3 py-2 font-semibold">Name</th>
                 <th className="px-3 py-2 font-semibold">Category</th>
@@ -120,39 +171,55 @@ export default function Items() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((i) => (
-                <tr key={i.id} className="border-b border-ui-border last:border-0 hover:bg-ui-rowhover">
-                  <td className="px-3 py-2 font-mono text-[11px] text-slate-600 cursor-pointer" onClick={() => setEditing({ ...i })}>
-                    {i.code}
-                  </td>
-                  <td className="px-3 py-2 cursor-pointer" onClick={() => setEditing({ ...i })}>
-                    <div className="font-semibold text-sai-navy">{i.name}</div>
-                    {i.description && <div className="text-[10px] text-slate-500 mt-0.5 truncate max-w-[380px]">{i.description}</div>}
-                  </td>
-                  <td className="px-3 py-2">
-                    <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-semibold ${catColor(i.category)}`}>
-                      {i.category}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-slate-600 truncate max-w-[220px]" title={i.product_line}>
-                    {i.product_line || "—"}
-                  </td>
-                  <td className="px-3 py-2 text-slate-600">{i.unit_of_measure}</td>
-                  <td className="px-3 py-2 text-right tabular-nums font-semibold text-sai-blue">
-                    {money(i.default_rate)}
-                  </td>
-                  <td className="px-3 py-2">
-                    <button
-                      onClick={() => remove(i)}
-                      title="Delete"
-                      className="text-slate-300 hover:text-red-500 text-[14px] leading-none"
-                    >×</button>
-                  </td>
-                </tr>
-              ))}
+              {rows.map((i) => {
+                const url = thumbUrl(i);
+                return (
+                  <tr key={i.id} className="border-b border-ui-border last:border-0 hover:bg-ui-rowhover">
+                    <td className="px-3 py-2 cursor-pointer" onClick={() => setEditing({ ...i })}>
+                      {url ? (
+                        <img
+                          src={url}
+                          alt=""
+                          className="w-8 h-8 rounded object-cover border border-ui-border"
+                        />
+                      ) : (
+                        <div className="w-8 h-8 rounded bg-slate-100 border border-ui-border flex items-center justify-center text-[10px] font-bold text-slate-400">
+                          {i.name.slice(0, 1).toUpperCase()}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 font-mono text-[11px] text-slate-600 cursor-pointer" onClick={() => setEditing({ ...i })}>
+                      {i.code}
+                    </td>
+                    <td className="px-3 py-2 cursor-pointer" onClick={() => setEditing({ ...i })}>
+                      <div className="font-semibold text-sai-navy">{i.name}</div>
+                      {i.description && <div className="text-[10px] text-slate-500 mt-0.5 truncate max-w-[380px]">{i.description}</div>}
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-semibold ${catColor(i.category)}`}>
+                        {i.category}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-slate-600 truncate max-w-[220px]" title={i.product_line}>
+                      {i.product_line || "—"}
+                    </td>
+                    <td className="px-3 py-2 text-slate-600">{i.unit_of_measure}</td>
+                    <td className="px-3 py-2 text-right tabular-nums font-semibold text-sai-blue">
+                      {money(i.default_rate)}
+                    </td>
+                    <td className="px-3 py-2">
+                      <button
+                        onClick={() => remove(i)}
+                        title="Delete"
+                        className="text-slate-300 hover:text-red-500 text-[14px] leading-none"
+                      >×</button>
+                    </td>
+                  </tr>
+                );
+              })}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-3 py-10 text-center text-slate-400 italic text-[12px]">
+                  <td colSpan={8} className="px-3 py-10 text-center text-slate-400 italic text-[12px]">
                     {q || cat ? "No items match your filter." : "No items yet. Click + New Item to get started."}
                   </td>
                 </tr>
@@ -166,16 +233,99 @@ export default function Items() {
       </div>
 
       {editing && (
-        <div className="fixed inset-0 bg-black/30 z-50 flex justify-end" onClick={() => setEditing(null)}>
-          <div className="bg-white w-[500px] h-full shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <RightDrawer
+          drawerKey="item-editor"
+          defaultWidth={500}
+          minWidth={420}
+          closeOnBackdropClick={false}
+          onClose={() => setEditing(null)}
+        >
             <div className="px-5 py-3 border-b border-ui-border flex items-center">
               <div className="text-[14px] font-display font-bold text-sai-navy">
                 {editing.id ? "Edit Item" : "New Item"}
               </div>
               <div className="flex-1" />
-              <button onClick={() => setEditing(null)} className="text-slate-400 hover:text-slate-700 text-lg leading-none px-1">×</button>
+              <DrawerCloseButton onClose={() => setEditing(null)} />
             </div>
             <div className="flex-1 overflow-y-auto scroll-thin px-5 py-4 space-y-3">
+              {editing.id && (
+                <div>
+                  <div className="field-label">Product image</div>
+                  <div
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={onDrop}
+                    className={`border-2 border-dashed rounded-md p-3 transition ${
+                      dragOver ? "border-sai-blue bg-sai-bluepale/40" : "border-ui-border bg-slate-50"
+                    }`}
+                  >
+                    {editing.image_path ? (
+                      <div className="flex gap-3 items-start">
+                        <img
+                          src={`/api/items/${editing.id}/image?v=${imageVersion}`}
+                          alt=""
+                          className="w-32 h-20 object-cover rounded border border-ui-border bg-white"
+                        />
+                        <div className="flex-1 text-[11px] text-slate-600">
+                          <div className="mb-1">Current photo set.</div>
+                          <div className="text-[10px] text-slate-400">Drag a new file here, or use the buttons below to replace or remove it.</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center text-center py-4">
+                        <div>
+                          <div className="text-[24px] mb-1">🖼️</div>
+                          <div className="text-[11px] text-slate-500">Drag an image here, or use the buttons below.</div>
+                          <div className="text-[10px] text-slate-400 mt-0.5">Up to 25 MB. JPG/PNG recommended at 16:9.</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) uploadImage(f);
+                      if (e.target) e.target.value = "";
+                    }}
+                  />
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    <button
+                      type="button"
+                      disabled={imgBusy}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-[11px] bg-sai-blue text-white px-3 py-1 rounded font-semibold hover:opacity-90 disabled:opacity-40"
+                    >
+                      {editing.image_path ? "Replace…" : "Upload…"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={imgBusy}
+                      onClick={() => setPromptItem(editing as Item)}
+                      className="text-[11px] border border-ui-border px-3 py-1 rounded font-semibold text-sai-blue hover:bg-sai-bluepale/40"
+                    >
+                      🎨 Generate with AI
+                    </button>
+                    {editing.image_path && (
+                      <button
+                        type="button"
+                        disabled={imgBusy}
+                        onClick={removeImage}
+                        className="text-[11px] border border-ui-border px-3 py-1 rounded text-red-500 hover:bg-red-50"
+                      >
+                        Remove image
+                      </button>
+                    )}
+                    {imgBusy && <span className="text-[11px] text-slate-400 self-center">Working…</span>}
+                  </div>
+                  {imgError && (
+                    <div className="mt-2 text-[11px] text-red-600">{imgError}</div>
+                  )}
+                </div>
+              )}
               <Field label="Code">
                 <input className="field-value font-mono" value={editing.code ?? ""}
                        onChange={(e) => setEditing({ ...editing, code: e.target.value })} />
@@ -222,6 +372,11 @@ export default function Items() {
                   {catalogue?.structure_types.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
               </Field>
+              {!editing.id && (
+                <div className="text-[11px] text-slate-400 italic">
+                  Save the item first, then re-open it to upload a product image.
+                </div>
+              )}
             </div>
             <div className="px-5 py-3 border-t border-ui-border flex justify-end gap-2">
               <button onClick={() => setEditing(null)} className="text-[12px] px-3 py-1.5 text-slate-500 hover:text-slate-800">
@@ -235,8 +390,11 @@ export default function Items() {
                 {busy ? "Saving…" : editing.id ? "Save" : "Create"}
               </button>
             </div>
-          </div>
-        </div>
+        </RightDrawer>
+      )}
+
+      {promptItem && (
+        <ImagePromptBuilder item={promptItem} onClose={() => setPromptItem(null)} />
       )}
     </div>
   );

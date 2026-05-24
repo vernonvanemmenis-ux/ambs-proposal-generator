@@ -27,8 +27,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from .db import Base, engine, LOGOS_DIR
-from .routers import clients, opportunities, proposals, status, updates, catalogue, items, database, templates, projects, opportunity_templates
+from .db import Base, engine, LOGOS_DIR, _ensure_columns
+from .routers import (
+    ai_draft,
+    catalogue,
+    clients,
+    database,
+    items,
+    opp_assets,
+    opportunities,
+    opportunity_templates,
+    projects,
+    proposals,
+    salespeople,
+    status,
+    templates,
+    updates,
+)
 from .seed import seed
 
 
@@ -41,6 +56,7 @@ STATIC_DIR.mkdir(exist_ok=True)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
+    _ensure_columns()
     seed()
     yield
 
@@ -65,6 +81,9 @@ app.include_router(database.router)
 app.include_router(templates.router)
 app.include_router(projects.router)
 app.include_router(opportunity_templates.router)
+app.include_router(salespeople.router)
+app.include_router(opp_assets.router)
+app.include_router(ai_draft.router)
 
 # Brand assets (logos) — accessible at /static/*
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")

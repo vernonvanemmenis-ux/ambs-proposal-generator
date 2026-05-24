@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, type Item } from "../api";
+import { api, type Item, type OpportunityTemplate } from "../api";
+import RightDrawer, { DrawerCloseButton } from "./RightDrawer";
 
 type PickedItem = {
   item: Item;
@@ -9,6 +10,14 @@ type PickedItem = {
 type Props = {
   onClose: () => void;
   onPick: (picks: PickedItem[]) => void;
+  // When provided, the picker fetches saved opportunity templates and renders
+  // them as "Quick start" chips at the top. Clicking a chip hands the template
+  // back to the parent and closes the picker — the parent decides whether to
+  // append, replace, or also apply the template's header fields.
+  onPickTemplate?: (template: OpportunityTemplate) => void;
+  // Template currently being edited — hidden from the chip row so users don't
+  // self-merge their own lines.
+  excludeTemplateId?: number;
 };
 
 function parseTags(s: string): string[] {
@@ -22,16 +31,46 @@ function money(v: number) {
   return "R " + v.toLocaleString("en-ZA", { maximumFractionDigits: 0 });
 }
 
-export default function CataloguePicker({ onClose, onPick }: Props) {
+const CATEGORY_ICONS: Record<string, string> = {
+  Structure: "🏗️",
+  Component: "🧱",
+  Service: "🛠️",
+};
+
+function categoryIcon(cat: string): string {
+  return CATEGORY_ICONS[cat] || "📦";
+}
+
+export default function CataloguePicker({ onClose, onPick, onPickTemplate, excludeTemplateId }: Props) {
   const [items, setItems] = useState<Item[]>([]);
   const [category, setCategory] = useState<string>("All");
   const [activeTags, setActiveTags] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState("");
   const [picks, setPicks] = useState<Record<number, number>>({});
+  const [templates, setTemplates] = useState<OpportunityTemplate[]>([]);
 
   useEffect(() => {
     api.items.list().then(setItems).catch(() => setItems([]));
   }, []);
+
+  useEffect(() => {
+    if (!onPickTemplate) return;
+    api.opportunityTemplates.list().then(setTemplates).catch(() => setTemplates([]));
+  }, [onPickTemplate]);
+
+  const quickStartTemplates = useMemo(
+    () =>
+      templates.filter(
+        (t) => t.is_active && (excludeTemplateId === undefined || t.id !== excludeTemplateId),
+      ),
+    [templates, excludeTemplateId],
+  );
+
+  const applyTemplate = (tpl: OpportunityTemplate) => {
+    if (!onPickTemplate) return;
+    onPickTemplate(tpl);
+    onClose();
+  };
 
   const categories = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -101,11 +140,8 @@ export default function CataloguePicker({ onClose, onPick }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 z-50 flex justify-end" onClick={onClose}>
-      <div
-        className="bg-white w-[920px] max-w-full h-full shadow-2xl flex"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <RightDrawer drawerKey="catalogue" defaultWidth={920} minWidth={620} onClose={onClose}>
+      <div className="flex h-full">
         <div className="w-[240px] border-r border-ui-border flex flex-col bg-slate-50">
           <div className="px-4 py-3 border-b border-ui-border">
             <div className="text-[11px] uppercase tracking-wider font-semibold text-slate-500">
@@ -182,6 +218,27 @@ export default function CataloguePicker({ onClose, onPick }: Props) {
         </div>
 
         <div className="flex-1 flex flex-col min-w-0">
+          {onPickTemplate && quickStartTemplates.length > 0 && (
+            <div className="px-4 py-2.5 border-b border-ui-border bg-sai-bluepale/60">
+              <div className="text-[10px] uppercase tracking-wider font-semibold text-sai-blue mb-1.5">
+                ⚡ Quick start from a saved template
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {quickStartTemplates.map((tpl) => (
+                  <button
+                    key={tpl.id}
+                    type="button"
+                    onClick={() => applyTemplate(tpl)}
+                    title={tpl.description}
+                    className="text-[11px] bg-white border border-sai-blue text-sai-blue px-2.5 py-1 rounded font-semibold hover:bg-sai-blue hover:text-white transition flex items-center gap-1.5"
+                  >
+                    <span>{tpl.icon}</span>
+                    <span>{tpl.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="px-4 py-3 border-b border-ui-border flex items-center gap-3">
             <div className="text-[14px] font-display font-bold text-sai-navy">
               {filtered.length} item{filtered.length === 1 ? "" : "s"}
@@ -193,12 +250,7 @@ export default function CataloguePicker({ onClose, onPick }: Props) {
               placeholder="Search by code, name, or description…"
               className="flex-1 text-[13px] border border-ui-border rounded px-3 py-1.5 outline-none focus:border-sai-blue"
             />
-            <button
-              onClick={onClose}
-              className="text-slate-400 hover:text-slate-700 text-lg leading-none px-1"
-            >
-              ×
-            </button>
+            <DrawerCloseButton onClose={onClose} />
           </div>
 
           <div className="flex-1 overflow-y-auto scroll-thin px-4 py-3">
@@ -209,10 +261,27 @@ export default function CataloguePicker({ onClose, onPick }: Props) {
                 return (
                   <div
                     key={it.id}
-                    className={`border rounded-md p-3 transition ${
+                    className={`border rounded-md overflow-hidden transition ${
                       picked > 0 ? "border-sai-blue bg-sai-bluepale" : "border-ui-border bg-white hover:shadow-card"
                     }`}
                   >
+                    <div className="aspect-[16/9] w-full bg-slate-100 relative overflow-hidden">
+                      {it.image_path ? (
+                        <img
+                          src={`/api/items/${it.id}/image`}
+                          alt=""
+                          loading="lazy"
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-sai-bluepale via-white to-slate-100">
+                          <span className="text-4xl opacity-60" aria-hidden>
+                            {categoryIcon(it.category)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3">
                     <div className="flex items-start gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="text-[12px] font-semibold text-sai-navy leading-tight">
@@ -278,6 +347,7 @@ export default function CataloguePicker({ onClose, onPick }: Props) {
                         </button>
                       )}
                     </div>
+                    </div>
                   </div>
                 );
               })}
@@ -317,6 +387,6 @@ export default function CataloguePicker({ onClose, onPick }: Props) {
           </div>
         </div>
       </div>
-    </div>
+    </RightDrawer>
   );
 }

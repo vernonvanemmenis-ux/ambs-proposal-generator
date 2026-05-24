@@ -197,9 +197,9 @@ def main():
     else:
         print("Skipping frontend build (--no-build).")
 
+    maybe_bump_updater_version(new_version)
     pending = stage_pending(new_version)
     marker = write_marker(new_version)
-    maybe_bump_updater_version(new_version)
 
     print()
     print(f"Staged payload : {pending}")

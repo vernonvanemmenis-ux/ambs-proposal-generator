@@ -2,6 +2,22 @@ from datetime import datetime, date
 from pydantic import BaseModel, ConfigDict
 
 
+# ---------------- Salespeople (HR) ----------------
+class SalespersonIn(BaseModel):
+    name: str
+    email: str = ""
+    phone: str = ""
+    role: str = ""
+    initials: str = ""
+    active: bool = True
+
+
+class SalespersonOut(SalespersonIn):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: datetime
+
+
 class ClientBase(BaseModel):
     name: str
     industry: str = ""
@@ -35,6 +51,8 @@ class OpportunityLineIn(BaseModel):
     discount_pct: float = 0.0
     is_optional: bool = False
     cost_rate: float = 0.0
+    # Template-bundle grouping; "" means ungrouped.
+    bundle_label: str = ""
 
 
 class OpportunityLineOut(OpportunityLineIn):
@@ -56,6 +74,12 @@ class OpportunityBase(BaseModel):
     valid_until: date | None = None
     salesperson: str = ""
     deposit_pct: float = 0.0
+    # Optional per-opportunity overrides for the template-level defaults.
+    # Empty string ("" or "{}") means "use the template default".
+    warranty_override: str = ""
+    site_logistics_override: str = ""
+    risks_override_json: str = ""
+    section_drafts_json: str = "{}"
 
 
 class OpportunityCreate(OpportunityBase):
@@ -72,6 +96,26 @@ class OpportunityUpdate(BaseModel):
     valid_until: date | None = None
     salesperson: str | None = None
     deposit_pct: float | None = None
+    warranty_override: str | None = None
+    site_logistics_override: str | None = None
+    risks_override_json: str | None = None
+    section_drafts_json: str | None = None
+
+
+class OpportunityAssetOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    filename: str
+    content_type: str
+    size_bytes: int
+    caption: str = ""
+    sequence: int = 0
+    uploaded_at: datetime
+
+
+class OpportunityAssetUpdate(BaseModel):
+    caption: str | None = None
+    sequence: int | None = None
 
 
 class OpportunityOut(OpportunityBase):
@@ -81,8 +125,30 @@ class OpportunityOut(OpportunityBase):
     amount: float
     optional_amount: float = 0.0
     project_id: int | None = None
+    hero_filename: str = ""
     client: ClientOut
     lines: list[OpportunityLineOut]
+    assets: list[OpportunityAssetOut] = []
+
+
+# ---------------- AI draft helper (offline-friendly) ----------------
+class AIDraftRequest(BaseModel):
+    prompt: str
+    paste_key: str = ""
+
+
+class AIDraftResponse(BaseModel):
+    text: str
+    provider: str = "openai"
+    configured: bool = True
+
+
+# ---------------- Risks ----------------
+class RiskRow(BaseModel):
+    risk: str
+    likelihood: str = "Medium"
+    impact: str = "Medium"
+    mitigation: str = ""
 
 
 # ---------------- Items catalogue ----------------
@@ -98,6 +164,7 @@ class ItemOut(BaseModel):
     default_rate: float
     description: str
     tags: str = ""
+    image_path: str = ""
 
 
 class ItemIn(BaseModel):
@@ -294,6 +361,19 @@ class TemplateBase(BaseModel):
     brand_primary_color: str = "#2563B0"
     brand_accent_color: str = "#0B1120"
     logo_filename: str = ""
+    # Per-template defaults for the new structured sections. Per-opportunity
+    # overrides on the Opportunity model win at render time when non-empty.
+    hero_filename: str = ""
+    default_warranty_md: str = ""
+    default_site_logistics_md: str = ""
+    default_risks_json: str = "[]"
+    # Tax / B-BBEE / company-registration block — template-level only.
+    tax_company_reg: str = ""
+    tax_vat_number: str = ""
+    tax_bbbee_level: str = ""
+    tax_bbbee_cert_expiry: str = ""
+    tax_address: str = ""
+    tax_directors: str = ""
     sections: list[SectionData] = []
 
 

@@ -11,6 +11,8 @@ import TemplateEditor from "./pages/TemplateEditor";
 import Projects from "./pages/Projects";
 import ProjectBoard from "./pages/ProjectBoard";
 import OpportunityTemplates from "./pages/OpportunityTemplates";
+import Salespeople from "./pages/Salespeople";
+import Sales from "./pages/Sales";
 
 export default function App() {
   return (
@@ -29,6 +31,8 @@ export default function App() {
           <Route path="/templates" element={<Templates />} />
           <Route path="/templates/:id" element={<TemplateEditor />} />
           <Route path="/opportunity-templates" element={<OpportunityTemplates />} />
+          <Route path="/hr" element={<Salespeople />} />
+          <Route path="/sales" element={<Sales />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>

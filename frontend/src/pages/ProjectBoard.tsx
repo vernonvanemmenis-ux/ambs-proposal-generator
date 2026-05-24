@@ -4,6 +4,7 @@ import { api, type Project, type ProjectStage, type Task } from "../api";
 import KanbanBoard, { type KanbanColumn } from "../components/KanbanBoard";
 import Chatter from "../components/Chatter";
 import AttachmentList from "../components/AttachmentList";
+import RightDrawer, { DrawerCloseButton } from "../components/RightDrawer";
 
 type TaskCard = Task & { columnId: number };
 
@@ -110,7 +111,7 @@ export default function ProjectBoard() {
       )}
 
       {creating && (
-        <NewTaskModal
+        <NewTaskDrawer
           projectId={projectId}
           stageId={creating.stageId}
           stages={project.stages}
@@ -223,11 +224,13 @@ function TaskDrawer({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 z-50 flex justify-end" onClick={onClose}>
-      <div
-        className="bg-white w-[640px] h-full shadow-2xl flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <RightDrawer
+      drawerKey="task"
+      defaultWidth={640}
+      minWidth={500}
+      closeOnBackdropClick={false}
+      onClose={onClose}
+    >
         <div className="px-5 py-3 border-b border-ui-border flex items-center">
           <div className="text-[14px] font-display font-bold text-sai-navy">Task details</div>
           <div className="flex-1" />
@@ -238,7 +241,7 @@ function TaskDrawer({
           >
             {busy ? "Saving…" : dirty ? "Save" : "Saved"}
           </button>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-lg leading-none px-1">×</button>
+          <DrawerCloseButton onClose={onClose} />
         </div>
 
         <div className="flex-1 overflow-y-auto scroll-thin px-5 py-4 space-y-4">
@@ -317,12 +320,11 @@ function TaskDrawer({
             Created {new Date(task.created_at).toLocaleString()}
           </div>
         </div>
-      </div>
-    </div>
+    </RightDrawer>
   );
 }
 
-function NewTaskModal({
+function NewTaskDrawer({
   projectId,
   stageId,
   stages,
@@ -364,13 +366,20 @@ function NewTaskModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 z-50 flex justify-center items-start pt-20" onClick={onClose}>
-      <div
-        className="bg-white w-[520px] rounded-md shadow-2xl p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="text-[14px] font-display font-bold text-sai-navy mb-3">New Task</div>
-        <div className="space-y-3">
+    <RightDrawer
+      drawerKey="new-task"
+      defaultWidth={520}
+      minWidth={420}
+      closeOnBackdropClick={false}
+      onClose={onClose}
+    >
+      <div className="px-5 py-3 border-b border-ui-border flex items-center">
+        <div className="text-[14px] font-display font-bold text-sai-navy">New Task</div>
+        <div className="flex-1" />
+        <DrawerCloseButton onClose={onClose} />
+      </div>
+
+      <div className="flex-1 overflow-y-auto scroll-thin px-5 py-4 space-y-3">
           <div>
             <div className="field-label">Title</div>
             <input
@@ -420,8 +429,9 @@ function NewTaskModal({
               onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
             />
           </div>
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
+      </div>
+
+      <div className="px-5 py-3 border-t border-ui-border flex justify-end gap-2">
           <button onClick={onClose} className="text-[12px] text-slate-500 hover:text-slate-800 px-3 py-1.5">
             Cancel
           </button>
@@ -432,8 +442,7 @@ function NewTaskModal({
           >
             {busy ? "Creating…" : "Create"}
           </button>
-        </div>
       </div>
-    </div>
+    </RightDrawer>
   );
 }

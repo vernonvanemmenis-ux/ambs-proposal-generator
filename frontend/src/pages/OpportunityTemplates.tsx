@@ -1,6 +1,33 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, type OpportunityTemplate, type TemplateLine } from "../api";
+import { api, type Item, type OpportunityTemplate, type TemplateLine } from "../api";
+import CataloguePicker from "../components/CataloguePicker";
+import RightDrawer, { DrawerCloseButton } from "../components/RightDrawer";
+
+// Curated AMBS-relevant industries. Existing template values not in this list
+// are still preserved via the "Other" sentinel option so legacy rows render.
+const TEMPLATE_INDUSTRIES = [
+  "Mining",
+  "Education",
+  "Healthcare",
+  "Industrial / Construction",
+  "Petrochemical",
+  "Agriculture",
+  "Hospitality",
+  "Government / Defence",
+  "Residential",
+  "Commercial",
+  "Logistics / Transport",
+  "NGO / Humanitarian",
+  "Telecoms / Utilities",
+  "Events",
+];
+
+// Curated emoji set matching the kinds of modular projects AMBS sells.
+const TEMPLATE_ICONS = [
+  "📋", "🏗️", "⛏️", "🏫", "🏥", "🏢", "🏠", "🛏️", "🍽️",
+  "📦", "🚛", "🐔", "🌱", "🏕️", "🛠️", "⚡", "🛡️", "🏭",
+];
 
 function money(v: number) {
   return "R " + v.toLocaleString("en-ZA", { maximumFractionDigits: 0 });
@@ -139,6 +166,7 @@ function TemplateEditor({
 }) {
   const [draft, setDraft] = useState<OpportunityTemplate>(template);
   const [busy, setBusy] = useState(false);
+  const [picking, setPicking] = useState(false);
 
   const update = <K extends keyof OpportunityTemplate>(k: K, v: OpportunityTemplate[K]) =>
     setDraft({ ...draft, [k]: v });
@@ -158,6 +186,31 @@ function TemplateEditor({
         { item_code: "", description: "", quantity: 1, unit_of_measure: "each", unit_rate: 0, product_line: "", structure_type: "", is_optional: false },
       ],
     });
+
+  const appendCatalogueItems = (picks: { item: Item; quantity: number }[]) => {
+    const next: TemplateLine[] = [
+      ...draft.default_lines,
+      ...picks.map((p) => ({
+        item_code: p.item.code,
+        description: p.item.description || p.item.name,
+        quantity: p.quantity,
+        unit_of_measure: p.item.unit_of_measure,
+        unit_rate: p.item.default_rate,
+        product_line: p.item.product_line,
+        structure_type: p.item.structure_type,
+        is_optional: false,
+      })),
+    ];
+    setDraft({ ...draft, default_lines: next });
+    setPicking(false);
+  };
+
+  const appendTemplateLines = (tpl: OpportunityTemplate) => {
+    setDraft({ ...draft, default_lines: [...draft.default_lines, ...tpl.default_lines] });
+    setPicking(false);
+  };
+
+  const industryInList = TEMPLATE_INDUSTRIES.includes(draft.industry);
 
   const save = async () => {
     setBusy(true);
@@ -182,22 +235,24 @@ function TemplateEditor({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/30 z-50 flex justify-end" onClick={onClose}>
-      <div
-        className="bg-white w-[860px] max-w-full h-full shadow-2xl flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="px-5 py-3 border-b border-ui-border flex items-center">
-          <div className="text-[14px] font-display font-bold text-sai-navy">
-            Edit Template: {draft.name}
-          </div>
-          <div className="flex-1" />
-          <button onClick={save} disabled={busy}
-                  className="text-[11px] bg-sai-blue text-white px-3 py-1.5 rounded font-semibold disabled:opacity-40 hover:opacity-90 mr-2">
-            {busy ? "Saving…" : "Save"}
-          </button>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-lg leading-none px-1">×</button>
+    <RightDrawer
+      drawerKey="opp-template-editor"
+      defaultWidth={860}
+      minWidth={620}
+      closeOnBackdropClick={false}
+      onClose={onClose}
+    >
+      <div className="px-5 py-3 border-b border-ui-border flex items-center">
+        <div className="text-[14px] font-display font-bold text-sai-navy">
+          Edit Template: {draft.name}
         </div>
+        <div className="flex-1" />
+        <button onClick={save} disabled={busy}
+                className="text-[11px] bg-sai-blue text-white px-3 py-1.5 rounded font-semibold disabled:opacity-40 hover:opacity-90 mr-2">
+          {busy ? "Saving…" : "Save"}
+        </button>
+        <DrawerCloseButton onClose={onClose} />
+      </div>
 
         <div className="flex-1 overflow-y-auto scroll-thin px-5 py-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
@@ -206,12 +261,43 @@ function TemplateEditor({
               <input className="field-value" value={draft.name} onChange={(e) => update("name", e.target.value)} />
             </div>
             <div>
-              <div className="field-label">Icon (emoji)</div>
-              <input className="field-value" value={draft.icon} onChange={(e) => update("icon", e.target.value)} />
+              <div className="field-label">Icon</div>
+              <div className="flex flex-wrap gap-1 border border-ui-border rounded px-1.5 py-1.5 bg-white">
+                {TEMPLATE_ICONS.map((emo) => {
+                  const on = draft.icon === emo;
+                  return (
+                    <button
+                      key={emo}
+                      type="button"
+                      onClick={() => update("icon", emo)}
+                      title={on ? "Selected" : "Use this icon"}
+                      className={`w-7 h-7 text-[18px] leading-none rounded flex items-center justify-center transition ${
+                        on
+                          ? "bg-sai-blue text-white ring-2 ring-sai-blue"
+                          : "hover:bg-slate-100"
+                      }`}
+                    >
+                      {emo}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
             <div>
               <div className="field-label">Industry</div>
-              <input className="field-value" value={draft.industry} onChange={(e) => update("industry", e.target.value)} />
+              <select
+                className="field-value"
+                value={industryInList || !draft.industry ? draft.industry : "__other__"}
+                onChange={(e) => update("industry", e.target.value === "__other__" ? draft.industry : e.target.value)}
+              >
+                <option value="">— select —</option>
+                {TEMPLATE_INDUSTRIES.map((ind) => (
+                  <option key={ind} value={ind}>{ind}</option>
+                ))}
+                {!industryInList && draft.industry && (
+                  <option value="__other__">{draft.industry} (legacy)</option>
+                )}
+              </select>
             </div>
             <div>
               <div className="field-label">Title hint for new opportunities</div>
@@ -245,11 +331,26 @@ function TemplateEditor({
           <div>
             <div className="flex items-center justify-between mb-2">
               <div className="field-label">Default line items</div>
-              <button onClick={addLine}
-                      className="text-[10px] border border-sai-blue text-sai-blue px-2 py-0.5 rounded font-semibold hover:bg-sai-bluepale">
-                + Add line
-              </button>
+              <div className="flex gap-1.5">
+                <button onClick={() => setPicking(true)}
+                        className="text-[10px] bg-sai-blue text-white px-2 py-0.5 rounded font-semibold hover:opacity-90"
+                        title="Browse the catalogue with category and tag filters">
+                  🗂️ Pick from catalogue
+                </button>
+                <button onClick={addLine}
+                        className="text-[10px] border border-sai-blue text-sai-blue px-2 py-0.5 rounded font-semibold hover:bg-sai-bluepale">
+                  + Blank line
+                </button>
+              </div>
             </div>
+            {picking && (
+              <CataloguePicker
+                onClose={() => setPicking(false)}
+                onPick={appendCatalogueItems}
+                onPickTemplate={appendTemplateLines}
+                excludeTemplateId={draft.id}
+              />
+            )}
             <div className="border border-ui-border rounded-md overflow-hidden">
               <div className="grid grid-cols-[60px_1fr_70px_60px_80px_44px_24px] gap-x-1 bg-slate-50 border-b border-ui-border px-2 py-1 text-[9px] uppercase tracking-wider font-semibold text-slate-500">
                 <div>Code</div><div>Description</div><div className="text-right">Qty</div><div>UoM</div><div className="text-right">Unit Rate</div><div className="text-center">Opt</div><div />
@@ -258,7 +359,7 @@ function TemplateEditor({
                 <div key={i} className="grid grid-cols-[60px_1fr_70px_60px_80px_44px_24px] gap-x-1 items-center border-b border-ui-border last:border-0 px-2 py-1 text-[11px]">
                   <input className="line-input font-mono" value={ln.item_code} onChange={(e) => updateLine(i, { item_code: e.target.value })} />
                   <input className="line-input" value={ln.description} onChange={(e) => updateLine(i, { description: e.target.value })} />
-                  <input type="number" className="line-input text-right" value={ln.quantity} onChange={(e) => updateLine(i, { quantity: Number(e.target.value) || 0 })} />
+                  <input type="number" min={0} step={ln.unit_of_measure === "each" ? 1 : 0.01} className="line-input text-right" value={ln.quantity} onChange={(e) => updateLine(i, { quantity: Number(e.target.value) || 0 })} />
                   <input className="line-input" value={ln.unit_of_measure} onChange={(e) => updateLine(i, { unit_of_measure: e.target.value })} />
                   <input type="number" className="line-input text-right" value={ln.unit_rate} onChange={(e) => updateLine(i, { unit_rate: Number(e.target.value) || 0 })} />
                   <div className="text-center"><input type="checkbox" checked={ln.is_optional} onChange={(e) => updateLine(i, { is_optional: e.target.checked })} /></div>
@@ -271,7 +372,6 @@ function TemplateEditor({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </RightDrawer>
   );
 }

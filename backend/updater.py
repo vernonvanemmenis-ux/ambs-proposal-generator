@@ -29,8 +29,9 @@ the updater reports "no updates configured" — updates are a no-op during dev.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import hashlib
-import json
 import os
 import shutil
 import sys
@@ -38,15 +39,73 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 import httpx
+
+try:
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+except ImportError:
+    InvalidSignature = None
+    Ed25519PublicKey = None
 
 # --------------------------------------------------------------------- config
 DEFAULT_MANIFEST_URL = (
     "https://github.com/vernonvanemmenis-ux/ambs-proposal-generator"
     "/releases/latest/download/manifest.json"
 )
-APP_VERSION = "0.4.0"  # bumped at each release; also written to payload VERSION file
+APP_VERSION = "0.4.11"  # bumped at each release; also written to payload VERSION file
+
+# Ed25519 verification keys, in priority order. To rotate: append the new
+# public key; never reorder or remove an entry until every release signed by
+# that key is out of service.
+# Generated 2026-05-21; private key at C:\Users\verno\Secrets\ambs_signing_key.bin.
+VERIFY_KEYS: tuple[bytes, ...] = (
+    bytes.fromhex(
+        "303f3933b75229dd294f574dae5ff9b038f1fd0b994f97d249309d6e127af1bc"
+    ),
+)
+
+# Payload zips may only be downloaded from these hosts over HTTPS.
+ALLOWED_PAYLOAD_HOSTS: frozenset[str] = frozenset({
+    "github.com",
+    "objects.githubusercontent.com",
+})
+
+
+def _verify_signature(sha256_hex: str, signature_b64: str) -> bool:
+    """Return True iff signature_b64 is a valid Ed25519 signature of the
+    ASCII sha256 hex digest under at least one key in VERIFY_KEYS."""
+    if InvalidSignature is None or Ed25519PublicKey is None:
+        return False
+    if not signature_b64:
+        return False
+    try:
+        sig = base64.b64decode(signature_b64, validate=True)
+    except (binascii.Error, ValueError):
+        return False
+    message = sha256_hex.encode("ascii")
+    for raw_pub in VERIFY_KEYS:
+        try:
+            Ed25519PublicKey.from_public_bytes(raw_pub).verify(sig, message)
+            return True
+        except InvalidSignature:
+            continue
+        except Exception:
+            continue
+    return False
+
+
+def _payload_url_allowed(url: str) -> bool:
+    try:
+        u = urlparse(url)
+    except Exception:
+        return False
+    if u.scheme != "https":
+        return False
+    host = (u.hostname or "").lower()
+    return host in ALLOWED_PAYLOAD_HOSTS
 
 
 # ----------------------------------------------------------------- dataclasses
@@ -55,6 +114,7 @@ class Manifest:
     version: str
     url: str
     sha256: str
+    signature: str = ""  # base64-encoded Ed25519 sig over the sha256 hex digest
     notes: str = ""
 
     @classmethod
@@ -63,6 +123,7 @@ class Manifest:
             version=str(data["version"]),
             url=str(data["url"]),
             sha256=str(data["sha256"]).lower(),
+            signature=str(data.get("signature", "")),
             notes=str(data.get("notes", "")),
         )
 
@@ -152,6 +213,10 @@ def check_for_update() -> dict:
             m = Manifest.from_json(r.json())
     except Exception:
         return base
+    # Treat any signature failure as "no update available" — silent so a
+    # tampered manifest never produces a banner asking the user to apply it.
+    if not _verify_signature(m.sha256, m.signature):
+        return base
     if is_newer(m.version, local):
         base.update({
             "available": True,
@@ -170,6 +235,14 @@ def apply_update() -> dict:
         r = client.get(manifest_url())
         r.raise_for_status()
         m = Manifest.from_json(r.json())
+
+    if not _verify_signature(m.sha256, m.signature):
+        raise RuntimeError("Update manifest signature is invalid or missing.")
+
+    if not _payload_url_allowed(m.url):
+        raise RuntimeError(
+            f"Refusing to download payload from disallowed URL: {m.url!r}"
+        )
 
     if not is_newer(m.version, current_version()):
         return {"applied": False, "reason": "Already on latest version."}

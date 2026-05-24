@@ -34,18 +34,29 @@ UNITS_OF_MEASURE = [
     "lump sum",
 ]
 
-SCHEMA_VERSION = 7  # bumped when DB schema changes — triggers wipe+reseed
+SCHEMA_VERSION = 8  # bumped when DB schema changes — triggers wipe+reseed
+# NOTE: do NOT bump SCHEMA_VERSION for additive column migrations — the
+# _ensure_columns() shim in db.py handles those idempotently without wiping
+# user data. Only bump for breaking schema changes.
 
 # Available section kinds for the proposal template editor. Each kind has its
 # own UI form + renderer in proposal_generator.py.
 SECTION_KINDS = [
     "header",
+    "hero",
+    "toc",
     "client_info",
     "text",
     "scope",
     "line_items",
+    "image_gallery",
     "commercial",
     "why_us",
+    "risks",
+    "warranty",
+    "site_logistics",
+    "compliance",
+    "appendix",
     "signature",
     "page_break",
 ]

@@ -22,8 +22,8 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
 from docx.shared import Pt, RGBColor, Cm
 from sqlalchemy.orm import Session
 
-from .db import LOGOS_DIR
-from .models import Proposal, ProposalTemplate
+from .db import ITEM_IMAGES_DIR, LOGOS_DIR, OPP_ATTACHMENTS_DIR, OPP_HEROES_DIR, TEMPLATE_HEROES_DIR
+from .models import Item, Proposal, ProposalTemplate
 
 
 GREY_600 = RGBColor(0x6B, 0x72, 0x80)
@@ -189,12 +189,35 @@ def _render_client_info(doc, section, ctx, accent):
     doc.add_paragraph()
 
 
-def _render_text(doc, section, ctx, accent):
+def _paste(opp, key: str) -> str:
+    """Return the per-section paste-back body for `key`, or empty string.
+
+    Reads `Opportunity.section_drafts_json`, a JSON object whose keys are the
+    `paste_key` of each section in the template and whose values are the body
+    the user pasted from ChatGPT (or that came back from /api/sections/draft).
+    Non-empty values win over the template's static `config.body` at render
+    time. Defensively swallows malformed JSON so a single bad entry doesn't
+    break the rest of the proposal.
+    """
+    if not key or opp is None:
+        return ""
+    try:
+        drafts = json.loads(getattr(opp, "section_drafts_json", "") or "{}")
+    except (ValueError, TypeError):
+        drafts = {}
+    if not isinstance(drafts, dict):
+        return ""
+    val = drafts.get(key)
+    return val.strip() if isinstance(val, str) else ""
+
+
+def _render_text(doc, section, opp, ctx, accent):
     cfg = section.get("config", {})
     heading = cfg.get("heading", "")
     if heading:
         _add_heading(doc, _substitute(heading, ctx), 12, accent)
-    body = cfg.get("body", "")
+    body = _paste(opp, cfg.get("paste_key", "")) or cfg.get("body", "")
+    # Treat blank lines as paragraph breaks; collapse single newlines into a single paragraph block.
     for para in (body or "").split("\n"):
         _add_para(doc, _substitute(para, ctx), size=10)
     doc.add_paragraph()
@@ -226,42 +249,127 @@ def _render_scope(doc, section, opp, ctx, accent):
     doc.add_paragraph()
 
 
-def _render_line_items_table(doc, lines, accent, subtotal_label: str):
-    """Helper: render a line-item table with a discount column and a subtotal row."""
+def _render_line_items_table(doc, lines, accent, subtotal_label: str, item_images: dict[str, Path] | None = None):
+    """Helper: render a line-item table with a discount column and a subtotal row.
+
+    Lines sharing a ``bundle_label`` (set when applying an Opportunity Template
+    in the New Opportunity drawer) render under a merged sub-heading row so the
+    client sees each module as a self-contained bundle while the headline
+    subtotal stays combined. When ``item_images`` maps an item code to an
+    on-disk path, the first line in each bundle that has an image causes a
+    hero-image row to be inserted before the bundle heading.
+    """
     headers = ["#", "Description", "Category", "Qty", "UoM", "Unit Rate", "Disc %", "Line Total"]
-    table = doc.add_table(rows=1 + len(lines) + 1, cols=len(headers))
+    images = item_images or {}
+
+    groups: list[tuple[str, list]] = []
+    for ln in lines:
+        label = (getattr(ln, "bundle_label", "") or "").strip()
+        if groups and groups[-1][0] == label:
+            groups[-1][1].append(ln)
+        else:
+            groups.append((label, [ln]))
+    bundle_header_count = sum(1 for label, _ in groups if label)
+
+    # For each bundle, find the first line whose item has a usable image.
+    bundle_images: list[Path | None] = []
+    for label, group_lines in groups:
+        chosen: Path | None = None
+        if label:
+            for ln in group_lines:
+                code = (getattr(ln, "item_code", "") or "").strip()
+                p = images.get(code)
+                if p and p.exists():
+                    chosen = p
+                    break
+        bundle_images.append(chosen)
+    image_row_count = sum(1 for p in bundle_images if p is not None)
+
+    total_rows = 1 + image_row_count + bundle_header_count + len(lines) + 1
+    table = doc.add_table(rows=total_rows, cols=len(headers))
     table.style = "Light Grid Accent 1"
     for j, h in enumerate(headers):
         cell = table.cell(0, j); cell.paragraphs[0].clear()
         r = cell.paragraphs[0].add_run(h); r.bold = True; r.font.size = Pt(9); r.font.color.rgb = accent
+
     subtotal = 0.0
-    for i, ln in enumerate(lines, start=1):
-        subtotal += ln.line_total
-        if ln.product_line and ln.description:
-            desc = f"{ln.product_line}\n{ln.description}"
-        else:
-            desc = ln.description or ln.product_line or "—"
-        qty = f"{ln.quantity:,.2f}".rstrip("0").rstrip(".")
-        disc = f"{(ln.discount_pct or 0):g}%" if (ln.discount_pct or 0) else "—"
-        values = [
-            str(i),
-            desc,
-            ln.structure_type or ln.product_line or "—",
-            qty,
-            ln.unit_of_measure or "each",
-            _money(ln.unit_rate),
-            disc,
-            _money(ln.line_total),
-        ]
-        for j, v in enumerate(values):
-            cell = table.cell(i, j); cell.paragraphs[0].clear()
-            r = cell.paragraphs[0].add_run(v); r.font.size = Pt(9)
-    sub_row = 1 + len(lines)
+    row = 1
+    line_index = 0
+    for (label, group_lines), hero_path in zip(groups, bundle_images):
+        if label:
+            if hero_path is not None:
+                img_cell = table.cell(row, 0)
+                img_cell.merge(table.cell(row, len(headers) - 1))
+                img_cell.paragraphs[0].clear()
+                img_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+                try:
+                    img_cell.paragraphs[0].add_run().add_picture(str(hero_path), width=Cm(6.5))
+                except Exception:
+                    pass  # If the image can't be read, fall back to no hero.
+                row += 1
+            group_total = sum(ln.line_total for ln in group_lines)
+            head = table.cell(row, 0)
+            head.merge(table.cell(row, len(headers) - 2))
+            head.paragraphs[0].clear()
+            r = head.paragraphs[0].add_run(f"▸ {label}"); r.bold = True; r.font.size = Pt(9); r.font.color.rgb = accent
+            tot = table.cell(row, len(headers) - 1); tot.paragraphs[0].clear()
+            r = tot.paragraphs[0].add_run(_money(group_total)); r.bold = True; r.font.size = Pt(9); r.font.color.rgb = accent
+            row += 1
+        for ln in group_lines:
+            line_index += 1
+            subtotal += ln.line_total
+            if ln.product_line and ln.description:
+                desc = f"{ln.product_line}\n{ln.description}"
+            else:
+                desc = ln.description or ln.product_line or "—"
+            qty = f"{ln.quantity:,.2f}".rstrip("0").rstrip(".")
+            disc = f"{(ln.discount_pct or 0):g}%" if (ln.discount_pct or 0) else "—"
+            values = [
+                str(line_index),
+                desc,
+                ln.structure_type or ln.product_line or "—",
+                qty,
+                ln.unit_of_measure or "each",
+                _money(ln.unit_rate),
+                disc,
+                _money(ln.line_total),
+            ]
+            for j, v in enumerate(values):
+                cell = table.cell(row, j); cell.paragraphs[0].clear()
+                r = cell.paragraphs[0].add_run(v); r.font.size = Pt(9)
+            row += 1
+
+    sub_row = total_rows - 1
     cell = table.cell(sub_row, 0); cell.merge(table.cell(sub_row, len(headers) - 2))
     cell.paragraphs[0].clear()
     r = cell.paragraphs[0].add_run(subtotal_label); r.bold = True; r.font.size = Pt(9); r.font.color.rgb = accent
     last = table.cell(sub_row, len(headers) - 1); last.paragraphs[0].clear()
     r = last.paragraphs[0].add_run(_money(subtotal)); r.bold = True; r.font.size = Pt(9); r.font.color.rgb = accent
+
+
+def _resolve_item_images(opp) -> dict[str, Path]:
+    """Look up the catalogue image for every item_code referenced by the
+    opportunity's lines. Returns an empty dict when the opportunity isn't
+    attached to a session (e.g. unit tests) — the caller treats that as
+    "no images" and falls back to text-only rendering.
+    """
+    codes = {(getattr(ln, "item_code", "") or "").strip() for ln in opp.lines}
+    codes.discard("")
+    if not codes:
+        return {}
+    session = Session.object_session(opp)
+    if session is None:
+        return {}
+    rows = (
+        session.query(Item.code, Item.image_path)
+        .filter(Item.code.in_(codes))
+        .all()
+    )
+    out: dict[str, Path] = {}
+    for code, rel in rows:
+        if rel:
+            out[code] = ITEM_IMAGES_DIR / rel
+    return out
 
 
 def _render_line_items(doc, section, opp, accent):
@@ -270,9 +378,10 @@ def _render_line_items(doc, section, opp, accent):
     all_lines = sorted(opp.lines, key=lambda x: x.sequence)
     mandatory = [ln for ln in all_lines if not ln.is_optional]
     optional = [ln for ln in all_lines if ln.is_optional]
+    item_images = _resolve_item_images(opp)
 
     if mandatory:
-        _render_line_items_table(doc, mandatory, accent, "Subtotal (excl. VAT)")
+        _render_line_items_table(doc, mandatory, accent, "Subtotal (excl. VAT)", item_images=item_images)
     else:
         _add_small(doc, "No line items.")
     doc.add_paragraph()
@@ -280,7 +389,7 @@ def _render_line_items(doc, section, opp, accent):
     if optional:
         _add_heading(doc, cfg.get("optional_heading", "Optional Add-ons"), 11, accent)
         _add_small(doc, "Pricing for items the client can choose to include. Not part of the headline total.")
-        _render_line_items_table(doc, optional, accent, "Optional add-ons subtotal")
+        _render_line_items_table(doc, optional, accent, "Optional add-ons subtotal", item_images=item_images)
         doc.add_paragraph()
 
 
@@ -351,16 +460,292 @@ def _render_page_break(doc, *_):
     p.add_run().add_break(WD_BREAK.PAGE)
 
 
+# --------------------------------------------------------------------- v0.4.1 sections
+_LIKELIHOOD_COLORS = {
+    "low": RGBColor(0x16, 0xA3, 0x4A),     # green-600
+    "medium": RGBColor(0xCA, 0x8A, 0x04),  # amber-600
+    "high": RGBColor(0xDC, 0x26, 0x26),    # red-600
+}
+
+
+def _section_title(section: dict, default: str) -> str:
+    """Pick the user-facing heading for a section. Honours `heading` first,
+    then falls back to a sensible per-kind default."""
+    cfg = section.get("config", {}) if isinstance(section, dict) else {}
+    return (cfg.get("heading") or default).strip()
+
+
+def _render_hero(doc, section, opp, tpl, accent):
+    """Big hero image at the top of the proposal. Per-opp override wins."""
+    candidate: Path | None = None
+    if opp is not None and getattr(opp, "hero_filename", ""):
+        p = OPP_HEROES_DIR / str(opp.id) / opp.hero_filename
+        if p.exists():
+            candidate = p
+    if candidate is None and tpl is not None and getattr(tpl, "hero_filename", ""):
+        p = TEMPLATE_HEROES_DIR / tpl.hero_filename
+        if p.exists():
+            candidate = p
+    if candidate is None:
+        return  # No image configured — emit nothing rather than a placeholder.
+    p = doc.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    try:
+        p.add_run().add_picture(str(candidate), width=Cm(16))
+    except Exception:
+        return
+    doc.add_paragraph()
+
+
+def _render_toc(doc, section, ctx, accent):
+    """Static (non-field) table of contents.
+
+    A Word TOC FIELD requires the user to right-click → Update Field on first
+    open which is bad UX for a one-shot proposal. We walk the section list
+    that `generate_proposal_docx` stashed in ctx and emit a simple numbered
+    list. Sections without a meaningful title (page breaks, the TOC itself,
+    hero images) are skipped.
+    """
+    sections = ctx.get("_sections") or []
+    cfg = section.get("config", {})
+    _add_heading(doc, cfg.get("heading", "Contents"), 12, accent)
+
+    skip_kinds = {"toc", "page_break", "hero"}
+    defaults = {
+        "header": "Header",
+        "client_info": "Prepared For",
+        "text": "",
+        "scope": "Scope of Work",
+        "line_items": "Line Items",
+        "image_gallery": "Gallery",
+        "commercial": "Commercial Summary",
+        "why_us": "Why Us",
+        "risks": "Risks & Mitigations",
+        "warranty": "Warranty",
+        "site_logistics": "Site & Logistics",
+        "compliance": "Company Information & Compliance",
+        "appendix": "Appendix",
+        "signature": "Acceptance",
+    }
+    seen = 0
+    for s in sections:
+        if not s.get("enabled", True):
+            continue
+        kind = s.get("kind", "")
+        if kind in skip_kinds:
+            continue
+        title = _section_title(s, defaults.get(kind, kind.title()))
+        if not title:
+            continue
+        seen += 1
+        _add_para(doc, f"{seen}.  {title}", size=10)
+    doc.add_paragraph()
+
+
+def _render_image_gallery(doc, section, opp, accent):
+    """Two-column grid of every line-item photo, alternating image and label."""
+    cfg = section.get("config", {})
+    item_images = _resolve_item_images(opp)
+    # Preserve line ordering and de-dupe by item_code so each product shows once.
+    ordered: list[tuple[str, Path, str]] = []
+    seen: set[str] = set()
+    for ln in sorted(opp.lines, key=lambda x: x.sequence):
+        code = (getattr(ln, "item_code", "") or "").strip()
+        if not code or code in seen:
+            continue
+        p = item_images.get(code)
+        if p and p.exists():
+            label = (ln.description or ln.product_line or code).strip()
+            ordered.append((code, p, label))
+            seen.add(code)
+    if not ordered:
+        return  # Skip the section entirely when there's nothing to show.
+
+    _add_heading(doc, cfg.get("heading", "Gallery"), 12, accent)
+    cols = 2
+    rows = (len(ordered) + cols - 1) // cols
+    table = doc.add_table(rows=rows * 2, cols=cols)  # image row + caption row per visual row
+    table.autofit = True
+    for idx, (_, img_path, label) in enumerate(ordered):
+        r = (idx // cols) * 2
+        c = idx % cols
+        img_cell = table.cell(r, c)
+        img_cell.paragraphs[0].clear()
+        img_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        try:
+            img_cell.paragraphs[0].add_run().add_picture(str(img_path), width=Cm(7.5))
+        except Exception:
+            pass
+        cap_cell = table.cell(r + 1, c)
+        cap_cell.paragraphs[0].clear()
+        cap_cell.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = cap_cell.paragraphs[0].add_run(label)
+        run.font.size = Pt(9); run.bold = True; run.font.color.rgb = accent
+    doc.add_paragraph()
+
+
+def _parse_risks(raw: str) -> list[dict]:
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(data, list):
+        return []
+    out: list[dict] = []
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        out.append({
+            "risk": str(entry.get("risk", "")).strip(),
+            "likelihood": str(entry.get("likelihood", "Medium")).strip() or "Medium",
+            "impact": str(entry.get("impact", "Medium")).strip() or "Medium",
+            "mitigation": str(entry.get("mitigation", "")).strip(),
+        })
+    return [r for r in out if r["risk"]]
+
+
+def _render_risks(doc, section, opp, tpl, accent):
+    cfg = section.get("config", {})
+    rows = _parse_risks(getattr(opp, "risks_override_json", "")) if opp is not None else []
+    if not rows:
+        rows = _parse_risks(getattr(tpl, "default_risks_json", "")) if tpl is not None else []
+    _add_heading(doc, cfg.get("heading", "Risks & Mitigations"), 12, accent)
+    if not rows:
+        _add_small(doc, "No risks identified for this engagement.")
+        doc.add_paragraph()
+        return
+    headers = ["Risk", "Likelihood", "Impact", "Mitigation"]
+    table = doc.add_table(rows=len(rows) + 1, cols=len(headers))
+    table.style = "Light Grid Accent 1"
+    for j, h in enumerate(headers):
+        cell = table.cell(0, j); cell.paragraphs[0].clear()
+        r = cell.paragraphs[0].add_run(h); r.bold = True; r.font.size = Pt(9); r.font.color.rgb = accent
+    for i, row in enumerate(rows, start=1):
+        for j, val in enumerate([row["risk"], row["likelihood"], row["impact"], row["mitigation"]]):
+            cell = table.cell(i, j); cell.paragraphs[0].clear()
+            run = cell.paragraphs[0].add_run(val); run.font.size = Pt(9)
+            if j in (1, 2):
+                colour = _LIKELIHOOD_COLORS.get(val.lower())
+                if colour is not None:
+                    run.bold = True
+                    run.font.color.rgb = colour
+    doc.add_paragraph()
+
+
+def _render_text_block(doc, heading: str, body: str, ctx: dict, accent: RGBColor):
+    if heading:
+        _add_heading(doc, _substitute(heading, ctx), 12, accent)
+    for para in (body or "").split("\n"):
+        _add_para(doc, _substitute(para, ctx), size=10)
+    doc.add_paragraph()
+
+
+def _render_warranty(doc, section, opp, tpl, ctx, accent):
+    cfg = section.get("config", {})
+    body = (
+        _paste(opp, cfg.get("paste_key", ""))
+        or (getattr(opp, "warranty_override", "") or "").strip()
+        or (getattr(tpl, "default_warranty_md", "") or "").strip()
+        or cfg.get("body", "")
+    )
+    if not body:
+        return  # Nothing configured — quietly skip rather than emit an empty heading.
+    _render_text_block(doc, cfg.get("heading", "Warranty"), body, ctx, accent)
+
+
+def _render_site_logistics(doc, section, opp, tpl, ctx, accent):
+    cfg = section.get("config", {})
+    body = (
+        _paste(opp, cfg.get("paste_key", ""))
+        or (getattr(opp, "site_logistics_override", "") or "").strip()
+        or (getattr(tpl, "default_site_logistics_md", "") or "").strip()
+        or cfg.get("body", "")
+    )
+    if not body:
+        return
+    _render_text_block(doc, cfg.get("heading", "Site & Logistics"), body, ctx, accent)
+
+
+def _render_compliance(doc, section, tpl, accent):
+    cfg = section.get("config", {})
+    rows: list[tuple[str, str]] = []
+    fields = [
+        ("Company Registration", "tax_company_reg"),
+        ("VAT Number", "tax_vat_number"),
+        ("B-BBEE Level", "tax_bbbee_level"),
+        ("B-BBEE Cert Expiry", "tax_bbbee_cert_expiry"),
+        ("Registered Address", "tax_address"),
+        ("Directors", "tax_directors"),
+    ]
+    for label, attr in fields:
+        val = (getattr(tpl, attr, "") or "").strip()
+        if val:
+            rows.append((label, val))
+    if not rows:
+        return
+    _add_heading(doc, cfg.get("heading", "Company Information & Compliance"), 12, accent)
+    _kv_table(doc, rows, accent)
+    doc.add_paragraph()
+
+
+def _render_appendix(doc, section, opp, accent):
+    """Embeds image assets inline, lists non-image attachments by filename.
+
+    Captions render under embedded images and after the filename for bullets.
+    Skips the section entirely when no assets are attached so we never emit a
+    naked heading + empty body.
+    """
+    assets = list(getattr(opp, "assets", []) or [])
+    if not assets:
+        return
+    cfg = section.get("config", {})
+    _add_heading(doc, cfg.get("heading", "Appendix — Drawings & Supporting Documents"), 12, accent)
+    assets.sort(key=lambda a: (a.sequence, a.uploaded_at))
+    for asset in assets:
+        path = Path(asset.stored_path) if asset.stored_path else (OPP_ATTACHMENTS_DIR / str(opp.id) / asset.filename)
+        is_image = (asset.content_type or "").lower().startswith("image/")
+        if is_image and path.exists():
+            p = doc.add_paragraph()
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            try:
+                p.add_run().add_picture(str(path), width=Cm(14))
+            except Exception:
+                _add_small(doc, f"[Could not embed image: {asset.filename}]")
+            if asset.caption:
+                cap = doc.add_paragraph()
+                cap.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                r = cap.add_run(asset.caption)
+                r.font.size = Pt(9); r.italic = True; r.font.color.rgb = GREY_600
+        else:
+            label = asset.filename
+            if asset.caption:
+                label = f"{label} — {asset.caption}"
+            p = doc.add_paragraph(style="List Bullet")
+            r = p.add_run(f"📎 {label}"); r.font.size = Pt(10)
+    doc.add_paragraph()
+
+
 _RENDERERS = {
     "header": lambda doc, s, opp, tpl, ctx, pri, acc: _render_header(doc, s, tpl, ctx, pri, acc),
     "client_info": lambda doc, s, opp, tpl, ctx, pri, acc: _render_client_info(doc, s, ctx, acc),
-    "text": lambda doc, s, opp, tpl, ctx, pri, acc: _render_text(doc, s, ctx, acc),
+    "text": lambda doc, s, opp, tpl, ctx, pri, acc: _render_text(doc, s, opp, ctx, acc),
     "scope": lambda doc, s, opp, tpl, ctx, pri, acc: _render_scope(doc, s, opp, ctx, acc),
     "line_items": lambda doc, s, opp, tpl, ctx, pri, acc: _render_line_items(doc, s, opp, acc),
     "commercial": lambda doc, s, opp, tpl, ctx, pri, acc: _render_commercial(doc, s, opp, ctx, acc),
     "why_us": lambda doc, s, opp, tpl, ctx, pri, acc: _render_why_us(doc, s, ctx, acc),
     "signature": lambda doc, s, opp, tpl, ctx, pri, acc: _render_signature(doc, s, acc),
     "page_break": lambda doc, s, opp, tpl, ctx, pri, acc: _render_page_break(doc),
+    # v0.4.1 additions
+    "hero": lambda doc, s, opp, tpl, ctx, pri, acc: _render_hero(doc, s, opp, tpl, acc),
+    "toc": lambda doc, s, opp, tpl, ctx, pri, acc: _render_toc(doc, s, ctx, acc),
+    "image_gallery": lambda doc, s, opp, tpl, ctx, pri, acc: _render_image_gallery(doc, s, opp, acc),
+    "risks": lambda doc, s, opp, tpl, ctx, pri, acc: _render_risks(doc, s, opp, tpl, acc),
+    "warranty": lambda doc, s, opp, tpl, ctx, pri, acc: _render_warranty(doc, s, opp, tpl, ctx, acc),
+    "site_logistics": lambda doc, s, opp, tpl, ctx, pri, acc: _render_site_logistics(doc, s, opp, tpl, ctx, acc),
+    "compliance": lambda doc, s, opp, tpl, ctx, pri, acc: _render_compliance(doc, s, tpl, acc),
+    "appendix": lambda doc, s, opp, tpl, ctx, pri, acc: _render_appendix(doc, s, opp, acc),
 }
 
 
@@ -378,6 +763,10 @@ def generate_proposal_docx(opportunity, filepath: Path, ref: str, template: Prop
         sections = json.loads(template.sections_json or "[]")
     except (ValueError, TypeError):
         sections = []
+
+    # Stash the section list in ctx so the TOC renderer can walk it without
+    # having to thread the list through every renderer's signature.
+    ctx["_sections"] = sections
 
     for section in sections:
         if not section.get("enabled", True):

@@ -19,8 +19,8 @@ const TILES: Tile[] = [
   { id: "items",     label: "Items",     color: "#10b981", icon: "📦", href: "/items" },
   { id: "templates", label: "Doc Templates", color: "#8b5cf6", icon: "🧩", href: "/templates" },
   { id: "opp-templates", label: "Project Templates", color: "#06b6d4", icon: "⚡", href: "/opportunity-templates" },
-  { id: "sales",     label: "Sales",     color: "#64748b", icon: "💰", disabled: true },
-  { id: "hr",        label: "HR",        color: "#64748b", icon: "👥", disabled: true },
+  { id: "sales",     label: "Sales",     color: "#ec4899", icon: "💰", href: "/sales" },
+  { id: "hr",        label: "HR",        color: "#0ea5e9", icon: "👥", href: "/hr" },
 ];
 
 function prettyBytes(n: number) {
