@@ -382,6 +382,127 @@ class Supplier(Base):
     )
 
 
+class Warehouse(Base):
+    """M3 — physical or logical warehouse.
+
+    Every internal location belongs to exactly one warehouse.
+    `code` is a short identifier used in stock-move references.
+    """
+    __tablename__ = "warehouses"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    code: Mapped[str] = mapped_column(String(20), default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    locations: Mapped[list["Location"]] = relationship(
+        back_populates="warehouse",
+        cascade="all,delete",
+        order_by="Location.id",
+    )
+
+
+class Location(Base):
+    """M3 — logical stock location.
+
+    `kind` controls behaviour at move time:
+      internal   — your own storage (any internal-only move is a transfer)
+      supplier   — virtual source for goods arriving on a PO
+      customer   — virtual sink for goods delivered to a sales customer
+      production — virtual sink/source for MO consumption/output (M5)
+      scrap      — virtual sink for written-off stock
+
+    Non-internal locations have no warehouse_id (NULL) — they live
+    outside the company's physical footprint. parent_id is reserved
+    for future zone/bin nesting; currently flat.
+    """
+    __tablename__ = "stock_locations"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    warehouse_id: Mapped[int | None] = mapped_column(ForeignKey("warehouses.id"), nullable=True)
+    name: Mapped[str] = mapped_column(String(120))
+    kind: Mapped[str] = mapped_column(String(20), default="internal")
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("stock_locations.id"), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    warehouse: Mapped["Warehouse | None"] = relationship(back_populates="locations")
+
+
+class Lot(Base):
+    """M3 — lot / serial / batch number.
+
+    Optional per-move. When set, quants are broken down by lot so the
+    user can trace which production batch a delivery came from.
+    """
+    __tablename__ = "stock_lots"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id"))
+    name: Mapped[str] = mapped_column(String(120))
+    expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class StockMove(Base):
+    """M3 — the source of truth for inventory state.
+
+    Every change to on-hand stock is a StockMove. Quants are computed
+    by summing done moves per (item, location). A move's lifecycle is
+    draft → confirmed → done, with `cancelled` as the terminal escape.
+    Done moves are immutable.
+
+    `reference_kind` + `reference_id` link back to the originating
+    document (PO receipt, sales delivery, manufacturing order). Free-form
+    so M3/M5/etc. can use the same column without a join table.
+    """
+    __tablename__ = "stock_moves"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id"))
+    qty: Mapped[float] = mapped_column(Float, default=0.0)
+    source_location_id: Mapped[int] = mapped_column(ForeignKey("stock_locations.id"))
+    dest_location_id: Mapped[int] = mapped_column(ForeignKey("stock_locations.id"))
+    state: Mapped[str] = mapped_column(String(20), default="draft")
+    reference_kind: Mapped[str] = mapped_column(String(20), default="")
+    reference_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    lot_id: Mapped[int | None] = mapped_column(ForeignKey("stock_lots.id"), nullable=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    done_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class ReorderRule(Base):
+    """M3 — auto-reorder threshold for an item at a location.
+
+    When on-hand at `location_id` drops below `min_qty`, the trigger
+    endpoint creates a draft PO with enough quantity to refill toward
+    `max_qty`, rounded UP to `qty_multiple` (default 1, i.e. no rounding).
+    Picks the cheapest active ItemSupplier as the supplier.
+    """
+    __tablename__ = "reorder_rules"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id"))
+    location_id: Mapped[int] = mapped_column(ForeignKey("stock_locations.id"))
+    min_qty: Mapped[float] = mapped_column(Float, default=0.0)
+    max_qty: Mapped[float] = mapped_column(Float, default=0.0)
+    qty_multiple: Mapped[float] = mapped_column(Float, default=1.0)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Scrap(Base):
+    """M3 — write-off event.
+
+    Always paired with a StockMove (internal → scrap location). This
+    table just stores the human-facing reason / metadata so we can list
+    scraps separately from regular transfers.
+    """
+    __tablename__ = "scraps"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    stock_move_id: Mapped[int] = mapped_column(ForeignKey("stock_moves.id"))
+    reason: Mapped[str] = mapped_column(String(400), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class PurchaseOrder(Base):
     """M2 — outbound purchase order to a supplier.
 
