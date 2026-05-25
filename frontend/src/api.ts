@@ -318,6 +318,84 @@ export type ItemSupplier = {
 
 export type ItemSupplierDraft = Omit<ItemSupplier, "id">;
 
+// M3 — Inventory: warehouses, locations, stock moves, lots, reorder rules, scrap.
+export type Warehouse = {
+  id: number;
+  name: string;
+  code: string;
+  active: boolean;
+  created_at: string;
+};
+
+export type LocationKind = "internal" | "supplier" | "customer" | "production" | "scrap";
+
+export type StockLocation = {
+  id: number;
+  warehouse_id: number | null;
+  name: string;
+  kind: LocationKind;
+  parent_id: number | null;
+  active: boolean;
+  created_at: string;
+};
+
+export type StockMoveState = "draft" | "confirmed" | "done" | "cancelled";
+
+export type StockMove = {
+  id: number;
+  item_id: number;
+  qty: number;
+  source_location_id: number;
+  dest_location_id: number;
+  state: StockMoveState;
+  reference_kind: string;
+  reference_id: number | null;
+  lot_id: number | null;
+  notes: string;
+  created_at: string;
+  done_at: string | null;
+};
+
+export type Quant = {
+  item_id: number;
+  location_id: number;
+  lot_id: number | null;
+  qty: number;
+};
+
+export type Lot = {
+  id: number;
+  item_id: number;
+  name: string;
+  expiry_date: string | null;
+  notes: string;
+  created_at: string;
+};
+
+export type ReorderRule = {
+  id: number;
+  item_id: number;
+  location_id: number;
+  min_qty: number;
+  max_qty: number;
+  qty_multiple: number;
+  active: boolean;
+  created_at: string;
+};
+
+export type ReorderTriggerResult = {
+  created_po_ids: number[];
+  skipped: { rule_id?: number; reason: string }[];
+};
+
+export type ScrapInput = {
+  item_id: number;
+  qty: number;
+  source_location_id: number;
+  reason?: string;
+  lot_id?: number | null;
+};
+
 // M2 — Purchase order lifecycle: draft → confirmed → received (or cancelled).
 export type PurchaseOrderStatus = "draft" | "confirmed" | "received" | "cancelled";
 
@@ -428,6 +506,127 @@ export const api = {
       }).then(j),
     delete: (id: number): Promise<{ ok: true }> =>
       fetch(`/api/tiles/${id}`, { method: "DELETE" }).then(j),
+  },
+  inventory: {
+    warehouses: {
+      list: (includeInactive = false): Promise<Warehouse[]> =>
+        fetch(`/api/inventory/warehouses${includeInactive ? "?include_inactive=true" : ""}`).then(j),
+      create: (body: Partial<Warehouse>): Promise<Warehouse> =>
+        fetch("/api/inventory/warehouses", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      update: (id: number, body: Partial<Warehouse>): Promise<Warehouse> =>
+        fetch(`/api/inventory/warehouses/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      delete: (id: number): Promise<{ ok: true; soft_deleted: true }> =>
+        fetch(`/api/inventory/warehouses/${id}`, { method: "DELETE" }).then(j),
+    },
+    locations: {
+      list: (params: { warehouse_id?: number; kind?: LocationKind; include_inactive?: boolean } = {}): Promise<StockLocation[]> => {
+        const qs = new URLSearchParams();
+        if (params.warehouse_id != null) qs.set("warehouse_id", String(params.warehouse_id));
+        if (params.kind) qs.set("kind", params.kind);
+        if (params.include_inactive) qs.set("include_inactive", "true");
+        const s = qs.toString();
+        return fetch(`/api/inventory/locations${s ? `?${s}` : ""}`).then(j);
+      },
+      create: (body: Partial<StockLocation>): Promise<StockLocation> =>
+        fetch("/api/inventory/locations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      update: (id: number, body: Partial<StockLocation>): Promise<StockLocation> =>
+        fetch(`/api/inventory/locations/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      delete: (id: number): Promise<{ ok: true; soft_deleted: true }> =>
+        fetch(`/api/inventory/locations/${id}`, { method: "DELETE" }).then(j),
+    },
+    moves: {
+      list: (params: { state?: StockMoveState; item_id?: number; location_id?: number; limit?: number } = {}): Promise<StockMove[]> => {
+        const qs = new URLSearchParams();
+        if (params.state) qs.set("state", params.state);
+        if (params.item_id != null) qs.set("item_id", String(params.item_id));
+        if (params.location_id != null) qs.set("location_id", String(params.location_id));
+        if (params.limit != null) qs.set("limit", String(params.limit));
+        const s = qs.toString();
+        return fetch(`/api/inventory/moves${s ? `?${s}` : ""}`).then(j);
+      },
+      create: (body: {
+        item_id: number;
+        qty: number;
+        source_location_id: number;
+        dest_location_id: number;
+        lot_id?: number | null;
+        reference_kind?: string;
+        reference_id?: number | null;
+        notes?: string;
+      }, immediate = false): Promise<StockMove> =>
+        fetch(`/api/inventory/moves${immediate ? "?immediate=true" : ""}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      confirm: (id: number): Promise<StockMove> =>
+        fetch(`/api/inventory/moves/${id}/confirm`, { method: "POST" }).then(j),
+      done: (id: number): Promise<StockMove> =>
+        fetch(`/api/inventory/moves/${id}/done`, { method: "POST" }).then(j),
+      cancel: (id: number): Promise<StockMove> =>
+        fetch(`/api/inventory/moves/${id}/cancel`, { method: "POST" }).then(j),
+    },
+    quants: (params: { item_id?: number; location_id?: number } = {}): Promise<Quant[]> => {
+      const qs = new URLSearchParams();
+      if (params.item_id != null) qs.set("item_id", String(params.item_id));
+      if (params.location_id != null) qs.set("location_id", String(params.location_id));
+      const s = qs.toString();
+      return fetch(`/api/inventory/quants${s ? `?${s}` : ""}`).then(j);
+    },
+    lots: {
+      list: (item_id?: number): Promise<Lot[]> =>
+        fetch(`/api/inventory/lots${item_id != null ? `?item_id=${item_id}` : ""}`).then(j),
+      create: (body: Partial<Lot>): Promise<Lot> =>
+        fetch("/api/inventory/lots", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      delete: (id: number): Promise<{ ok: true }> =>
+        fetch(`/api/inventory/lots/${id}`, { method: "DELETE" }).then(j),
+    },
+    reorderRules: {
+      list: (includeInactive = false): Promise<ReorderRule[]> =>
+        fetch(`/api/inventory/reorder-rules${includeInactive ? "?include_inactive=true" : ""}`).then(j),
+      create: (body: Partial<ReorderRule>): Promise<ReorderRule> =>
+        fetch("/api/inventory/reorder-rules", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      update: (id: number, body: Partial<ReorderRule>): Promise<ReorderRule> =>
+        fetch(`/api/inventory/reorder-rules/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      delete: (id: number): Promise<{ ok: true }> =>
+        fetch(`/api/inventory/reorder-rules/${id}`, { method: "DELETE" }).then(j),
+      trigger: (): Promise<ReorderTriggerResult> =>
+        fetch("/api/inventory/reorder-rules/trigger", { method: "POST" }).then(j),
+    },
+    scrap: (body: ScrapInput): Promise<{ id: number; stock_move_id: number; reason: string; created_at: string }> =>
+      fetch("/api/inventory/scrap", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
   },
   purchaseOrders: {
     list: (status?: PurchaseOrderStatus): Promise<PurchaseOrder[]> => {
