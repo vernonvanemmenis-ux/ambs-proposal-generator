@@ -289,6 +289,35 @@ export type Salesperson = {
   created_at: string;
 };
 
+// M1 — vendor/supplier directory. Buy-side counterpart to Client.
+export type Supplier = {
+  id: number;
+  name: string;
+  contact_person: string;
+  email: string;
+  phone: string;
+  address: string;
+  payment_terms: string;
+  lead_time_days: number;
+  active: boolean;
+  notes: string;
+  created_at: string;
+  item_links: ItemSupplier[];
+};
+
+export type ItemSupplier = {
+  id: number;
+  item_id: number;
+  supplier_id: number;
+  supplier_code: string;
+  supplier_price: number;
+  currency: string;
+  min_qty: number;
+  lead_time_days: number;
+};
+
+export type ItemSupplierDraft = Omit<ItemSupplier, "id">;
+
 // Studio mode — user-defined launcher tile. Clicking one navigates to
 // /p/<slug>, which renders <PageRenderer pageKey={`custom:${slug}`} />.
 export type CustomTile = {
@@ -341,6 +370,43 @@ export const api = {
       }).then(j),
     delete: (id: number): Promise<{ ok: true }> =>
       fetch(`/api/tiles/${id}`, { method: "DELETE" }).then(j),
+  },
+  suppliers: {
+    list: (includeInactive = false): Promise<Supplier[]> =>
+      fetch(`/api/suppliers${includeInactive ? "?include_inactive=true" : ""}`).then(j),
+    get: (id: number): Promise<Supplier> => fetch(`/api/suppliers/${id}`).then(j),
+    create: (body: Partial<Supplier>): Promise<Supplier> =>
+      fetch("/api/suppliers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    update: (id: number, body: Partial<Supplier>): Promise<Supplier> =>
+      fetch(`/api/suppliers/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    delete: (id: number): Promise<{ ok: true; soft_deleted: true }> =>
+      fetch(`/api/suppliers/${id}`, { method: "DELETE" }).then(j),
+    items: {
+      list: (supplierId: number): Promise<ItemSupplier[]> =>
+        fetch(`/api/suppliers/${supplierId}/items`).then(j),
+      create: (supplierId: number, body: ItemSupplierDraft): Promise<ItemSupplier> =>
+        fetch(`/api/suppliers/${supplierId}/items`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      update: (supplierId: number, linkId: number, body: ItemSupplierDraft): Promise<ItemSupplier> =>
+        fetch(`/api/suppliers/${supplierId}/items/${linkId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      delete: (supplierId: number, linkId: number): Promise<{ ok: true }> =>
+        fetch(`/api/suppliers/${supplierId}/items/${linkId}`, { method: "DELETE" }).then(j),
+    },
   },
   salespeople: {
     list: (includeInactive = false): Promise<Salesperson[]> =>
