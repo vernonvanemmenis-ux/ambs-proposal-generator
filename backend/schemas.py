@@ -405,6 +405,93 @@ class PageLayoutUpdate(BaseModel):
     blocks: list[PageLayoutBlock]
 
 
+# ---------------- M4 — Sales orders / Invoices / Payments ----------------
+class PaymentIn(BaseModel):
+    amount: float
+    method: str = "eft"  # cash | eft | card
+    reference: str = ""
+    notes: str = ""
+    received_at: datetime | None = None
+
+
+class PaymentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    invoice_id: int
+    amount: float
+    method: str
+    reference: str
+    notes: str
+    received_at: datetime
+
+
+class InvoiceIn(BaseModel):
+    sales_order_id: int
+    kind: str = "regular"  # regular | down_payment
+    total: float = 0.0
+    currency: str = "ZAR"
+    due_date: date | None = None
+    notes: str = ""
+
+
+class InvoiceUpdate(BaseModel):
+    total: float | None = None
+    due_date: date | None = None
+    notes: str | None = None
+
+
+class InvoiceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    ref: str
+    sales_order_id: int
+    kind: str
+    state: str
+    total: float
+    currency: str
+    due_date: date | None
+    notes: str
+    created_at: datetime
+    sent_at: datetime | None
+    paid_at: datetime | None
+    paid_total: float
+    outstanding: float
+    payments: list[PaymentOut] = []
+
+
+class SalesOrderConfirmIn(BaseModel):
+    """Payload for POST /api/opportunities/{id}/confirm.
+
+    Optional source/dest hint for the reserved stock moves. When omitted,
+    the backend picks the default internal location + first customer
+    virtual location and falls back to skipping the reservation silently
+    if either is missing (so the user can still confirm a SO before
+    setting up inventory).
+    """
+    source_location_id: int | None = None
+    dest_location_id: int | None = None
+    notes: str = ""
+
+
+class SalesOrderOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    ref: str
+    opportunity_id: int
+    state: str
+    currency: str
+    deposit_pct: float
+    notes: str
+    created_at: datetime
+    confirmed_at: datetime | None
+    delivered_at: datetime | None
+    cancelled_at: datetime | None
+    total: float
+    invoiced_total: float
+    paid_total: float
+    invoices: list[InvoiceOut] = []
+
+
 # ---------------- M3 — Inventory ----------------
 class WarehouseIn(BaseModel):
     name: str
