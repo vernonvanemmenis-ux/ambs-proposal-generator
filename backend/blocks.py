@@ -52,6 +52,18 @@ PAGE_BLOCKS: dict[str, dict[str, dict]] = {
             "default_enabled": True,
         },
     },
+    "purchase": {
+        "po_stats": {
+            "label": "PO stats row",
+            "description": "Top-bar tiles showing per-status counts and total open committed spend.",
+            "default_enabled": True,
+        },
+        "po_kanban": {
+            "label": "PO kanban board",
+            "description": "Drag-to-move kanban grouping purchase orders by lifecycle status (draft, confirmed, received, cancelled).",
+            "default_enabled": True,
+        },
+    },
     "custom": {
         "heading": {
             "label": "Heading",

@@ -405,6 +405,72 @@ class PageLayoutUpdate(BaseModel):
     blocks: list[PageLayoutBlock]
 
 
+# ---------------- M2 — Purchase orders ----------------
+class PurchaseLineIn(BaseModel):
+    item_id: int | None = None
+    sequence: int = 0
+    description: str = ""
+    quantity: float = 1.0
+    unit_of_measure: str = "each"
+    unit_cost: float = 0.0
+    supplier_code: str = ""
+
+
+class PurchaseLineOut(PurchaseLineIn):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    received_qty: float
+    line_total: float
+
+
+class PurchaseOrderBase(BaseModel):
+    supplier_id: int
+    expected_date: date | None = None
+    currency: str = "ZAR"
+    notes: str = ""
+
+
+class PurchaseOrderCreate(PurchaseOrderBase):
+    lines: list[PurchaseLineIn] = []
+
+
+class PurchaseOrderUpdate(BaseModel):
+    supplier_id: int | None = None
+    expected_date: date | None = None
+    currency: str | None = None
+    notes: str | None = None
+
+
+class PurchaseOrderOut(PurchaseOrderBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    ref: str
+    status: str
+    created_at: datetime
+    confirmed_at: datetime | None = None
+    received_at: datetime | None = None
+    total: float
+    lines: list[PurchaseLineOut] = []
+
+
+class ReceiptLineIn(BaseModel):
+    line_id: int
+    received_qty: float
+
+
+class ReceiptIn(BaseModel):
+    notes: str = ""
+    lines: list[ReceiptLineIn] = []
+
+
+class ReceiptOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    received_at: datetime
+    notes: str
+    lines_json: str
+
+
 # ---------------- M1 — Suppliers ----------------
 class ItemSupplierIn(BaseModel):
     item_id: int
