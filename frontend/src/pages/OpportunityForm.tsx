@@ -7,6 +7,7 @@ import {
   type Opportunity,
   type OpportunityLineDraft,
   type Proposal,
+  type SalesOrder,
   type Salesperson,
   type Status,
   type Template,
@@ -105,6 +106,8 @@ export default function OpportunityForm() {
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState<"message" | "note" | "log">("message");
+  const [salesOrder, setSalesOrder] = useState<SalesOrder | null>(null);
+  const [confirmingSo, setConfirmingSo] = useState(false);
 
   const load = () => {
     api.opportunities.get(oppId).then((o) => {
@@ -114,6 +117,7 @@ export default function OpportunityForm() {
     api.opportunities.activities(oppId).then(setActivities).catch(() => {});
     api.proposals.list().then(setProposals).catch(() => {});
     api.status().then(setStatus).catch(() => {});
+    api.salesOrders.byOpportunity(oppId).then(setSalesOrder).catch(() => setSalesOrder(null));
   };
 
   useEffect(() => {
@@ -245,6 +249,22 @@ export default function OpportunityForm() {
     api.opportunities.activities(opp.id).then(setActivities);
   };
 
+  const confirmToSO = async () => {
+    if (dirty) {
+      if (!confirm("You have unsaved changes. Confirming will use the last-saved state. Continue?")) return;
+    } else if (!confirm("Confirm this opportunity to a Sales Order? Reserves stock from your default internal location.")) return;
+    setConfirmingSo(true);
+    try {
+      const so = await api.salesOrders.confirm(opp.id, {});
+      setSalesOrder(so);
+      nav(`/sales-orders/${so.id}`);
+    } catch (e: any) {
+      alert("Confirm failed: " + (e?.message || e));
+    } finally {
+      setConfirmingSo(false);
+    }
+  };
+
   return (
     <div className="min-h-[calc(100vh-44px)]">
       <div className="bg-white border-b border-ui-border px-4 py-2 flex items-center gap-3">
@@ -254,6 +274,28 @@ export default function OpportunityForm() {
         <div className="text-slate-300">/</div>
         <div className="text-[13px] font-semibold text-sai-navy font-display truncate">{opp.title}</div>
         <div className="flex-1" />
+        {salesOrder ? (
+          <Link
+            to={`/sales-orders/${salesOrder.id}`}
+            className="text-[11px] border border-sai-blue text-sai-blue px-3 py-1.5 rounded font-semibold hover:bg-sai-bluepale"
+            title={`Open ${salesOrder.ref} (state: ${salesOrder.state})`}
+          >
+            ↗ {salesOrder.ref}
+          </Link>
+        ) : (
+          <button
+            onClick={confirmToSO}
+            disabled={confirmingSo || lines.length === 0}
+            title={
+              lines.length === 0
+                ? "Add at least one line first"
+                : "Create a structured Sales Order and reserve stock"
+            }
+            className="text-[11px] border border-sai-blue text-sai-blue px-3 py-1.5 rounded font-semibold hover:bg-sai-bluepale disabled:opacity-40"
+          >
+            {confirmingSo ? "Confirming…" : "Confirm to SO"}
+          </button>
+        )}
         <button
           onClick={save}
           disabled={!dirty || busy}

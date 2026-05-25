@@ -24,6 +24,8 @@ const TILES: Tile[] = [
   { id: "suppliers", label: "Suppliers", color: "#6366f1", icon: "🚚", href: "/suppliers" },
   { id: "purchase",  label: "Purchase Orders", color: "#a16207", icon: "🧾", href: "/purchase-orders" },
   { id: "inventory", label: "Inventory",  color: "#0d9488", icon: "📦", href: "/inventory" },
+  { id: "sales-orders", label: "Sales Orders", color: "#7c3aed", icon: "📑", href: "/sales-orders" },
+  { id: "invoices",   label: "Invoices",     color: "#16a34a", icon: "💵", href: "/invoices" },
 ];
 
 const PALETTE = [
