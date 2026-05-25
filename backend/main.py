@@ -43,6 +43,7 @@ from .routers import (
     proposals,
     salespeople,
     status,
+    suppliers,
     templates,
     updates,
 )
@@ -84,6 +85,7 @@ app.include_router(templates.router)
 app.include_router(projects.router)
 app.include_router(opportunity_templates.router)
 app.include_router(salespeople.router)
+app.include_router(suppliers.router)
 app.include_router(opp_assets.router)
 app.include_router(ai_draft.router)
 app.include_router(layouts.router)

@@ -45,6 +45,13 @@ PAGE_BLOCKS: dict[str, dict[str, dict]] = {
             "default_enabled": True,
         },
     },
+    "suppliers": {
+        "supplier_list": {
+            "label": "Supplier list",
+            "description": "Searchable table of all vendors with contact details and links to items they supply.",
+            "default_enabled": True,
+        },
+    },
     "custom": {
         "heading": {
             "label": "Heading",

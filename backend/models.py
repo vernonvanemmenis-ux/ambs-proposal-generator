@@ -355,6 +355,54 @@ class PageLayout(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class Supplier(Base):
+    """M1 — vendor/supplier directory.
+
+    Separate from Client (which is buy-side). Each supplier can offer
+    multiple Items via the ItemSupplier join (with their own code/price/
+    lead time). Soft-delete via `active=False` so historical purchase
+    orders still resolve their supplier name.
+    """
+    __tablename__ = "suppliers"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    contact_person: Mapped[str] = mapped_column(String(200), default="")
+    email: Mapped[str] = mapped_column(String(200), default="")
+    phone: Mapped[str] = mapped_column(String(60), default="")
+    address: Mapped[str] = mapped_column(String(400), default="")
+    payment_terms: Mapped[str] = mapped_column(String(120), default="")
+    lead_time_days: Mapped[int] = mapped_column(Integer, default=0)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    item_links: Mapped[list["ItemSupplier"]] = relationship(
+        back_populates="supplier",
+        cascade="all,delete",
+    )
+
+
+class ItemSupplier(Base):
+    """M1 — many-to-many between Item and Supplier with per-link metadata.
+
+    Lets the same item have multiple suppliers (with different prices /
+    lead times); the purchase planner in M2 will pick the cheapest active
+    link by default. Per-link `lead_time_days` overrides the supplier's
+    default when non-zero.
+    """
+    __tablename__ = "item_suppliers"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id"))
+    supplier_id: Mapped[int] = mapped_column(ForeignKey("suppliers.id"))
+    supplier_code: Mapped[str] = mapped_column(String(60), default="")
+    supplier_price: Mapped[float] = mapped_column(Float, default=0.0)
+    currency: Mapped[str] = mapped_column(String(8), default="ZAR")
+    min_qty: Mapped[float] = mapped_column(Float, default=0.0)
+    lead_time_days: Mapped[int] = mapped_column(Integer, default=0)
+
+    supplier: Mapped[Supplier] = relationship(back_populates="item_links")
+
+
 class CustomTile(Base):
     """Studio mode — user-defined launcher tile.
 

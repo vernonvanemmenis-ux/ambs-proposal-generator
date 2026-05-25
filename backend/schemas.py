@@ -405,6 +405,48 @@ class PageLayoutUpdate(BaseModel):
     blocks: list[PageLayoutBlock]
 
 
+# ---------------- M1 — Suppliers ----------------
+class ItemSupplierIn(BaseModel):
+    item_id: int
+    supplier_id: int
+    supplier_code: str = ""
+    supplier_price: float = 0.0
+    currency: str = "ZAR"
+    min_qty: float = 0.0
+    lead_time_days: int = 0
+
+
+class ItemSupplierOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    item_id: int
+    supplier_id: int
+    supplier_code: str
+    supplier_price: float
+    currency: str
+    min_qty: float
+    lead_time_days: int
+
+
+class SupplierIn(BaseModel):
+    name: str
+    contact_person: str = ""
+    email: str = ""
+    phone: str = ""
+    address: str = ""
+    payment_terms: str = ""
+    lead_time_days: int = 0
+    active: bool = True
+    notes: str = ""
+
+
+class SupplierOut(SupplierIn):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: datetime
+    item_links: list[ItemSupplierOut] = []
+
+
 # ---------------- Studio — custom launcher tiles ----------------
 class CustomTileIn(BaseModel):
     """Payload for creating a user-defined launcher tile.
