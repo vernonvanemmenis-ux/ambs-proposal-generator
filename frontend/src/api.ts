@@ -318,6 +318,64 @@ export type ItemSupplier = {
 
 export type ItemSupplierDraft = Omit<ItemSupplier, "id">;
 
+// M2 — Purchase order lifecycle: draft → confirmed → received (or cancelled).
+export type PurchaseOrderStatus = "draft" | "confirmed" | "received" | "cancelled";
+
+export type PurchaseLine = {
+  id: number;
+  item_id: number | null;
+  sequence: number;
+  description: string;
+  quantity: number;
+  unit_of_measure: string;
+  unit_cost: number;
+  received_qty: number;
+  supplier_code: string;
+  line_total: number;
+};
+
+export type PurchaseLineDraft = Omit<PurchaseLine, "id" | "received_qty" | "line_total"> & { id?: number };
+
+export type PurchaseOrder = {
+  id: number;
+  ref: string;
+  supplier_id: number;
+  status: PurchaseOrderStatus;
+  expected_date: string | null;
+  currency: string;
+  notes: string;
+  created_at: string;
+  confirmed_at: string | null;
+  received_at: string | null;
+  total: number;
+  lines: PurchaseLine[];
+};
+
+export type PurchaseOrderDraft = {
+  supplier_id: number;
+  expected_date?: string | null;
+  currency?: string;
+  notes?: string;
+  lines: PurchaseLineDraft[];
+};
+
+export type ReceiptLineInput = {
+  line_id: number;
+  received_qty: number;
+};
+
+export type ReceiptInput = {
+  notes?: string;
+  lines: ReceiptLineInput[];
+};
+
+export type Receipt = {
+  id: number;
+  received_at: string;
+  notes: string;
+  lines_json: string;
+};
+
 // Studio mode — user-defined launcher tile. Clicking one navigates to
 // /p/<slug>, which renders <PageRenderer pageKey={`custom:${slug}`} />.
 export type CustomTile = {
@@ -370,6 +428,45 @@ export const api = {
       }).then(j),
     delete: (id: number): Promise<{ ok: true }> =>
       fetch(`/api/tiles/${id}`, { method: "DELETE" }).then(j),
+  },
+  purchaseOrders: {
+    list: (status?: PurchaseOrderStatus): Promise<PurchaseOrder[]> => {
+      const q = status ? `?status=${status}` : "";
+      return fetch(`/api/purchase-orders${q}`).then(j);
+    },
+    get: (id: number): Promise<PurchaseOrder> => fetch(`/api/purchase-orders/${id}`).then(j),
+    create: (body: PurchaseOrderDraft): Promise<PurchaseOrder> =>
+      fetch("/api/purchase-orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    update: (id: number, body: Partial<Omit<PurchaseOrderDraft, "lines">>): Promise<PurchaseOrder> =>
+      fetch(`/api/purchase-orders/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    replaceLines: (id: number, lines: PurchaseLineDraft[]): Promise<PurchaseOrder> =>
+      fetch(`/api/purchase-orders/${id}/lines`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(lines),
+      }).then(j),
+    delete: (id: number): Promise<{ ok: true }> =>
+      fetch(`/api/purchase-orders/${id}`, { method: "DELETE" }).then(j),
+    confirm: (id: number): Promise<PurchaseOrder> =>
+      fetch(`/api/purchase-orders/${id}/confirm`, { method: "POST" }).then(j),
+    cancel: (id: number): Promise<PurchaseOrder> =>
+      fetch(`/api/purchase-orders/${id}/cancel`, { method: "POST" }).then(j),
+    receive: (id: number, body: ReceiptInput): Promise<PurchaseOrder> =>
+      fetch(`/api/purchase-orders/${id}/receive`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    receipts: (id: number): Promise<Receipt[]> =>
+      fetch(`/api/purchase-orders/${id}/receipts`).then(j),
   },
   suppliers: {
     list: (includeInactive = false): Promise<Supplier[]> =>
