@@ -484,8 +484,14 @@ export default function OpportunityForm() {
           onSaved={load}
         />
 
-        {/* ChatGPT prompt builder */}
-        <PromptBuilder opp={opp} lines={lines} subtotal={lineSubtotal} />
+        {/* ChatGPT prompt builders — 5 fixed sections + 1 custom */}
+        <PromptBuilder
+          opp={opp}
+          lines={lines}
+          subtotal={lineSubtotal}
+          template={templates.find((t) => t.id === selectedTemplateId) ?? null}
+          onSaved={load}
+        />
 
         {/* Chatter */}
         <div className="bg-white border border-ui-border rounded-md">
