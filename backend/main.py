@@ -38,6 +38,7 @@ from .routers import (
     items,
     launcher_tiles,
     layouts,
+    manufacturing,
     opp_assets,
     opportunities,
     opportunity_templates,
@@ -94,6 +95,7 @@ app.include_router(purchase_orders.router)
 app.include_router(inventory.router)
 app.include_router(sales_orders.router)
 app.include_router(invoices.router)
+app.include_router(manufacturing.router)
 app.include_router(opp_assets.router)
 app.include_router(ai_draft.router)
 app.include_router(layouts.router)

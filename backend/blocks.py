@@ -131,6 +131,32 @@ PAGE_BLOCKS: dict[str, dict[str, dict]] = {
             "default_enabled": True,
         },
     },
+    "manufacturing": {
+        "mo_stats": {
+            "label": "MO stats row",
+            "description": "Draft/confirmed/in-progress/done counts plus throughput.",
+            "default_enabled": True,
+        },
+        "mo_kanban": {
+            "label": "MO kanban",
+            "description": "Manufacturing orders grouped by state (draft, confirmed, in_progress, done, cancelled).",
+            "default_enabled": True,
+        },
+    },
+    "boms": {
+        "bom_list": {
+            "label": "BoM list",
+            "description": "All Bills of Materials with finished item, version, line/operation counts.",
+            "default_enabled": True,
+        },
+    },
+    "work_centers": {
+        "work_center_list": {
+            "label": "Work centers",
+            "description": "Stations where BoM operations run. Capacity per hour, cost per hour, calendar.",
+            "default_enabled": True,
+        },
+    },
     "custom": {
         "heading": {
             "label": "Heading",

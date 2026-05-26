@@ -382,6 +382,178 @@ class Supplier(Base):
     )
 
 
+class BoM(Base):
+    """M5 — Bill of Materials.
+
+    A versioned recipe for producing `qty_produced` units of `item_id`
+    (the finished good). One item can have multiple BoMs (e.g.
+    different versions) but only one is active at a time per
+    (item_id, version). The MO planner picks the latest active BoM
+    when an explicit one isn't supplied.
+    """
+    __tablename__ = "boms"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id"))
+    code: Mapped[str] = mapped_column(String(60), default="")
+    version: Mapped[str] = mapped_column(String(20), default="1.0")
+    qty_produced: Mapped[float] = mapped_column(Float, default=1.0)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    lines: Mapped[list["BoMLine"]] = relationship(
+        back_populates="bom",
+        cascade="all,delete",
+        order_by="BoMLine.sequence",
+    )
+    operations: Mapped[list["BoMOperation"]] = relationship(
+        back_populates="bom",
+        cascade="all,delete",
+        order_by="BoMOperation.sequence",
+    )
+
+
+class BoMLine(Base):
+    """M5 — one component required by a BoM.
+
+    `qty_required` is the qty needed to produce one batch of the BoM
+    (i.e. for `qty_produced` finished units). MO consumption scales
+    by qty_to_produce / bom.qty_produced.
+    `scrap_pct` adds a per-line wastage buffer at MO-creation time.
+    """
+    __tablename__ = "bom_lines"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    bom_id: Mapped[int] = mapped_column(ForeignKey("boms.id"))
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id"))
+    sequence: Mapped[int] = mapped_column(Integer, default=0)
+    qty_required: Mapped[float] = mapped_column(Float, default=1.0)
+    unit_of_measure: Mapped[str] = mapped_column(String(20), default="each")
+    scrap_pct: Mapped[float] = mapped_column(Float, default=0.0)
+
+    bom: Mapped[BoM] = relationship(back_populates="lines")
+
+
+class BoMOperation(Base):
+    """M5 — manufacturing step inside a BoM.
+
+    Each operation runs at a `work_center_id`. WorkOrders are spawned
+    from operations when an MO is confirmed.
+    """
+    __tablename__ = "bom_operations"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    bom_id: Mapped[int] = mapped_column(ForeignKey("boms.id"))
+    work_center_id: Mapped[int] = mapped_column(ForeignKey("work_centers.id"))
+    name: Mapped[str] = mapped_column(String(120))
+    sequence: Mapped[int] = mapped_column(Integer, default=0)
+    duration_min: Mapped[float] = mapped_column(Float, default=0.0)
+    notes: Mapped[str] = mapped_column(Text, default="")
+
+    bom: Mapped[BoM] = relationship(back_populates="operations")
+
+
+class WorkCenter(Base):
+    """M5 — physical or virtual workstation.
+
+    `capacity_units_per_hour` informs throughput estimates (M6 will
+    use this for scheduling charts). `calendar_json` reserved for
+    per-weekday working hours; flat for now.
+    """
+    __tablename__ = "work_centers"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(String(120))
+    code: Mapped[str] = mapped_column(String(20), default="")
+    capacity_units_per_hour: Mapped[float] = mapped_column(Float, default=1.0)
+    cost_per_hour: Mapped[float] = mapped_column(Float, default=0.0)
+    calendar_json: Mapped[str] = mapped_column(Text, default="{}")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class ManufacturingOrder(Base):
+    """M5 — production order.
+
+    Lifecycle: draft → confirmed → in_progress → done (terminal:
+    cancelled). On confirm, reserves component StockMoves
+    (internal → production loc, state=confirmed). On done, those
+    reservations are completed AND a production output move is
+    created (production → internal, state=done).
+    """
+    __tablename__ = "manufacturing_orders"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ref: Mapped[str] = mapped_column(String(40), default="")
+    bom_id: Mapped[int] = mapped_column(ForeignKey("boms.id"))
+    qty_to_produce: Mapped[float] = mapped_column(Float, default=1.0)
+    state: Mapped[str] = mapped_column(String(20), default="draft")
+    source_location_id: Mapped[int | None] = mapped_column(ForeignKey("stock_locations.id"), nullable=True)
+    dest_location_id: Mapped[int | None] = mapped_column(ForeignKey("stock_locations.id"), nullable=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    scheduled_start: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    bom: Mapped[BoM] = relationship()
+    work_orders: Mapped[list["WorkOrder"]] = relationship(
+        back_populates="mo",
+        cascade="all,delete",
+        order_by="WorkOrder.sequence",
+    )
+    quality_checks: Mapped[list["QualityCheck"]] = relationship(
+        back_populates="mo",
+        cascade="all,delete",
+        order_by="QualityCheck.created_at",
+    )
+
+
+class WorkOrder(Base):
+    """M5 — one execution step on an MO.
+
+    Spawned from a BoMOperation when the MO is confirmed. State machine:
+    pending → in_progress → done (terminal: cancelled).
+    """
+    __tablename__ = "work_orders"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    mo_id: Mapped[int] = mapped_column(ForeignKey("manufacturing_orders.id"))
+    operation_id: Mapped[int | None] = mapped_column(ForeignKey("bom_operations.id"), nullable=True)
+    work_center_id: Mapped[int] = mapped_column(ForeignKey("work_centers.id"))
+    name: Mapped[str] = mapped_column(String(120))
+    sequence: Mapped[int] = mapped_column(Integer, default=0)
+    state: Mapped[str] = mapped_column(String(20), default="pending")
+    operator: Mapped[str] = mapped_column(String(120), default="")
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    actual_duration_min: Mapped[float] = mapped_column(Float, default=0.0)
+    notes: Mapped[str] = mapped_column(Text, default="")
+
+    mo: Mapped[ManufacturingOrder] = relationship(back_populates="work_orders")
+
+
+class QualityCheck(Base):
+    """M5 — a quality control check attached to an MO (and optionally a WO).
+
+    `kind`: pass_fail | measure | visual.
+    `result`: "pass" | "fail" | "" (pending).
+    Failing checks block MO completion.
+    """
+    __tablename__ = "quality_checks"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    mo_id: Mapped[int] = mapped_column(ForeignKey("manufacturing_orders.id"))
+    work_order_id: Mapped[int | None] = mapped_column(ForeignKey("work_orders.id"), nullable=True)
+    name: Mapped[str] = mapped_column(String(200))
+    kind: Mapped[str] = mapped_column(String(20), default="pass_fail")
+    result: Mapped[str] = mapped_column(String(20), default="")
+    measured_value: Mapped[str] = mapped_column(String(120), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    performed_by: Mapped[str] = mapped_column(String(120), default="")
+    performed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    mo: Mapped[ManufacturingOrder] = relationship(back_populates="quality_checks")
+
+
 class SalesOrder(Base):
     """M4 — confirmed sales order.
 

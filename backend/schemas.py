@@ -405,6 +405,163 @@ class PageLayoutUpdate(BaseModel):
     blocks: list[PageLayoutBlock]
 
 
+# ---------------- M5 — Manufacturing ----------------
+class WorkCenterIn(BaseModel):
+    name: str
+    code: str = ""
+    capacity_units_per_hour: float = 1.0
+    cost_per_hour: float = 0.0
+    calendar_json: str = "{}"
+    active: bool = True
+    notes: str = ""
+
+
+class WorkCenterOut(WorkCenterIn):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: datetime
+
+
+class BoMLineIn(BaseModel):
+    item_id: int
+    sequence: int = 0
+    qty_required: float = 1.0
+    unit_of_measure: str = "each"
+    scrap_pct: float = 0.0
+
+
+class BoMLineOut(BoMLineIn):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+
+
+class BoMOperationIn(BaseModel):
+    work_center_id: int
+    name: str
+    sequence: int = 0
+    duration_min: float = 0.0
+    notes: str = ""
+
+
+class BoMOperationOut(BoMOperationIn):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+
+
+class BoMIn(BaseModel):
+    item_id: int
+    code: str = ""
+    version: str = "1.0"
+    qty_produced: float = 1.0
+    active: bool = True
+    notes: str = ""
+    lines: list[BoMLineIn] = []
+    operations: list[BoMOperationIn] = []
+
+
+class BoMOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    item_id: int
+    code: str
+    version: str
+    qty_produced: float
+    active: bool
+    notes: str
+    created_at: datetime
+    lines: list[BoMLineOut] = []
+    operations: list[BoMOperationOut] = []
+
+
+class WorkOrderOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    mo_id: int
+    operation_id: int | None
+    work_center_id: int
+    name: str
+    sequence: int
+    state: str
+    operator: str
+    started_at: datetime | None
+    finished_at: datetime | None
+    actual_duration_min: float
+    notes: str
+
+
+class WorkOrderUpdate(BaseModel):
+    operator: str | None = None
+    notes: str | None = None
+    actual_duration_min: float | None = None
+
+
+class QualityCheckIn(BaseModel):
+    mo_id: int
+    work_order_id: int | None = None
+    name: str
+    kind: str = "pass_fail"  # pass_fail | measure | visual
+    notes: str = ""
+
+
+class QualityCheckUpdate(BaseModel):
+    result: str | None = None  # pass | fail
+    measured_value: str | None = None
+    notes: str | None = None
+    performed_by: str | None = None
+
+
+class QualityCheckOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    mo_id: int
+    work_order_id: int | None
+    name: str
+    kind: str
+    result: str
+    measured_value: str
+    notes: str
+    performed_by: str
+    performed_at: datetime | None
+    created_at: datetime
+
+
+class ManufacturingOrderIn(BaseModel):
+    bom_id: int
+    qty_to_produce: float = 1.0
+    source_location_id: int | None = None
+    dest_location_id: int | None = None
+    scheduled_start: datetime | None = None
+    notes: str = ""
+
+
+class ManufacturingOrderUpdate(BaseModel):
+    qty_to_produce: float | None = None
+    source_location_id: int | None = None
+    dest_location_id: int | None = None
+    scheduled_start: datetime | None = None
+    notes: str | None = None
+
+
+class ManufacturingOrderOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    ref: str
+    bom_id: int
+    qty_to_produce: float
+    state: str
+    source_location_id: int | None
+    dest_location_id: int | None
+    notes: str
+    scheduled_start: datetime | None
+    confirmed_at: datetime | None
+    started_at: datetime | None
+    finished_at: datetime | None
+    cancelled_at: datetime | None
+    created_at: datetime
+    work_orders: list[WorkOrderOut] = []
+    quality_checks: list[QualityCheckOut] = []
+
+
 # ---------------- M4 — Sales orders / Invoices / Payments ----------------
 class PaymentIn(BaseModel):
     amount: float
