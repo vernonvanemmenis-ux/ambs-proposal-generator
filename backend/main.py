@@ -34,6 +34,7 @@ from .routers import (
     clients,
     database,
     inventory,
+    invoices,
     items,
     launcher_tiles,
     layouts,
@@ -43,6 +44,7 @@ from .routers import (
     projects,
     proposals,
     purchase_orders,
+    sales_orders,
     salespeople,
     status,
     suppliers,
@@ -90,6 +92,8 @@ app.include_router(salespeople.router)
 app.include_router(suppliers.router)
 app.include_router(purchase_orders.router)
 app.include_router(inventory.router)
+app.include_router(sales_orders.router)
+app.include_router(invoices.router)
 app.include_router(opp_assets.router)
 app.include_router(ai_draft.router)
 app.include_router(layouts.router)

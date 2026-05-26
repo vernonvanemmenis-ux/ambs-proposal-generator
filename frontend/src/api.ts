@@ -318,6 +318,58 @@ export type ItemSupplier = {
 
 export type ItemSupplierDraft = Omit<ItemSupplier, "id">;
 
+// M4 — Sales orders, invoices, payments.
+export type SalesOrderState = "confirmed" | "delivered" | "invoiced" | "paid" | "cancelled";
+export type InvoiceKind = "regular" | "down_payment";
+export type InvoiceState = "draft" | "sent" | "paid" | "cancelled";
+export type PaymentMethod = "cash" | "eft" | "card" | "other";
+
+export type Payment = {
+  id: number;
+  invoice_id: number;
+  amount: number;
+  method: PaymentMethod;
+  reference: string;
+  notes: string;
+  received_at: string;
+};
+
+export type Invoice = {
+  id: number;
+  ref: string;
+  sales_order_id: number;
+  kind: InvoiceKind;
+  state: InvoiceState;
+  total: number;
+  currency: string;
+  due_date: string | null;
+  notes: string;
+  created_at: string;
+  sent_at: string | null;
+  paid_at: string | null;
+  paid_total: number;
+  outstanding: number;
+  payments: Payment[];
+};
+
+export type SalesOrder = {
+  id: number;
+  ref: string;
+  opportunity_id: number;
+  state: SalesOrderState;
+  currency: string;
+  deposit_pct: number;
+  notes: string;
+  created_at: string;
+  confirmed_at: string | null;
+  delivered_at: string | null;
+  cancelled_at: string | null;
+  total: number;
+  invoiced_total: number;
+  paid_total: number;
+  invoices: Invoice[];
+};
+
 // M3 — Inventory: warehouses, locations, stock moves, lots, reorder rules, scrap.
 export type Warehouse = {
   id: number;
@@ -506,6 +558,67 @@ export const api = {
       }).then(j),
     delete: (id: number): Promise<{ ok: true }> =>
       fetch(`/api/tiles/${id}`, { method: "DELETE" }).then(j),
+  },
+  salesOrders: {
+    list: (state?: SalesOrderState): Promise<SalesOrder[]> => {
+      const q = state ? `?state=${state}` : "";
+      return fetch(`/api/sales-orders${q}`).then(j);
+    },
+    get: (id: number): Promise<SalesOrder> => fetch(`/api/sales-orders/${id}`).then(j),
+    byOpportunity: (oppId: number): Promise<SalesOrder | null> =>
+      fetch(`/api/sales-orders/by-opportunity/${oppId}`).then(j),
+    confirm: (oppId: number, body: { source_location_id?: number; dest_location_id?: number; notes?: string } = {}): Promise<SalesOrder> =>
+      fetch(`/api/opportunities/${oppId}/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    deliver: (id: number): Promise<SalesOrder> =>
+      fetch(`/api/sales-orders/${id}/deliver`, { method: "POST" }).then(j),
+    cancel: (id: number): Promise<SalesOrder> =>
+      fetch(`/api/sales-orders/${id}/cancel`, { method: "POST" }).then(j),
+  },
+  invoices: {
+    list: (params: { state?: InvoiceState; sales_order_id?: number } = {}): Promise<Invoice[]> => {
+      const qs = new URLSearchParams();
+      if (params.state) qs.set("state", params.state);
+      if (params.sales_order_id != null) qs.set("sales_order_id", String(params.sales_order_id));
+      const s = qs.toString();
+      return fetch(`/api/invoices${s ? `?${s}` : ""}`).then(j);
+    },
+    get: (id: number): Promise<Invoice> => fetch(`/api/invoices/${id}`).then(j),
+    create: (body: {
+      sales_order_id: number;
+      kind: InvoiceKind;
+      total?: number;
+      due_date?: string | null;
+      notes?: string;
+    }): Promise<Invoice> =>
+      fetch("/api/invoices", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    update: (id: number, body: { total?: number; due_date?: string | null; notes?: string }): Promise<Invoice> =>
+      fetch(`/api/invoices/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    send: (id: number): Promise<Invoice> =>
+      fetch(`/api/invoices/${id}/send`, { method: "POST" }).then(j),
+    cancel: (id: number): Promise<Invoice> =>
+      fetch(`/api/invoices/${id}/cancel`, { method: "POST" }).then(j),
+    delete: (id: number): Promise<{ ok: true }> =>
+      fetch(`/api/invoices/${id}`, { method: "DELETE" }).then(j),
+    addPayment: (id: number, body: { amount: number; method?: PaymentMethod; reference?: string; notes?: string; received_at?: string }): Promise<Payment> =>
+      fetch(`/api/invoices/${id}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    deletePayment: (id: number, payId: number): Promise<{ ok: true }> =>
+      fetch(`/api/invoices/${id}/payments/${payId}`, { method: "DELETE" }).then(j),
   },
   inventory: {
     warehouses: {

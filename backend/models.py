@@ -382,6 +382,104 @@ class Supplier(Base):
     )
 
 
+class SalesOrder(Base):
+    """M4 — confirmed sales order.
+
+    Created when an Opportunity is "confirmed". Carries the quote into
+    a structured lifecycle that produces stock reservations, deliveries,
+    invoices, and payments. The opportunity stays around as the upstream
+    proposal artefact; the sales order is the source of truth for what
+    was actually agreed.
+
+    State machine: draft → confirmed → delivered → invoiced → paid.
+    `cancelled` is the terminal escape from any non-paid state.
+    """
+    __tablename__ = "sales_orders"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ref: Mapped[str] = mapped_column(String(40), default="")
+    opportunity_id: Mapped[int] = mapped_column(ForeignKey("opportunities.id"), unique=True)
+    state: Mapped[str] = mapped_column(String(20), default="confirmed")
+    currency: Mapped[str] = mapped_column(String(8), default="ZAR")
+    deposit_pct: Mapped[float] = mapped_column(Float, default=0.0)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    opportunity: Mapped["Opportunity"] = relationship()
+    invoices: Mapped[list["Invoice"]] = relationship(
+        back_populates="sales_order",
+        cascade="all,delete",
+        order_by="Invoice.created_at",
+    )
+
+    @property
+    def total(self) -> float:
+        """Total = opportunity's mandatory-line subtotal. Optional lines stay optional."""
+        return float(self.opportunity.amount or 0.0) if self.opportunity else 0.0
+
+    @property
+    def invoiced_total(self) -> float:
+        return sum(float(inv.total or 0.0) for inv in self.invoices if inv.state != "cancelled")
+
+    @property
+    def paid_total(self) -> float:
+        return sum(float(inv.paid_total) for inv in self.invoices if inv.state != "cancelled")
+
+
+class Invoice(Base):
+    """M4 — invoice issued against a sales order.
+
+    Two kinds: `regular` (full balance) and `down_payment` (deposit %).
+    A typical M4 flow on a 40% deposit SO is: create down-payment invoice
+    on confirm, mark paid, deliver, create balance invoice (kind=regular,
+    auto-amount = SO total - paid down-payment), mark paid → SO paid.
+    """
+    __tablename__ = "invoices"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ref: Mapped[str] = mapped_column(String(40), default="")
+    sales_order_id: Mapped[int] = mapped_column(ForeignKey("sales_orders.id"))
+    kind: Mapped[str] = mapped_column(String(20), default="regular")
+    state: Mapped[str] = mapped_column(String(20), default="draft")
+    total: Mapped[float] = mapped_column(Float, default=0.0)
+    currency: Mapped[str] = mapped_column(String(8), default="ZAR")
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    sales_order: Mapped[SalesOrder] = relationship(back_populates="invoices")
+    payments: Mapped[list["Payment"]] = relationship(
+        back_populates="invoice",
+        cascade="all,delete",
+        order_by="Payment.received_at",
+    )
+
+    @property
+    def paid_total(self) -> float:
+        return sum(float(p.amount or 0.0) for p in self.payments)
+
+    @property
+    def outstanding(self) -> float:
+        return max(0.0, float(self.total or 0.0) - self.paid_total)
+
+
+class Payment(Base):
+    """M4 — a single payment recorded against an invoice."""
+    __tablename__ = "payments"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    invoice_id: Mapped[int] = mapped_column(ForeignKey("invoices.id"))
+    amount: Mapped[float] = mapped_column(Float, default=0.0)
+    method: Mapped[str] = mapped_column(String(20), default="eft")
+    reference: Mapped[str] = mapped_column(String(120), default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    received_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    invoice: Mapped[Invoice] = relationship(back_populates="payments")
+
+
 class Warehouse(Base):
     """M3 — physical or logical warehouse.
 

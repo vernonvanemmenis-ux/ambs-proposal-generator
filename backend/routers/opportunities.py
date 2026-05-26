@@ -6,18 +6,32 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from datetime import datetime
+
 from ..constants import DEFAULT_PROJECT_STAGES
 from ..db import OPP_HEROES_DIR, get_db
-from ..models import Opportunity, OpportunityLine, Activity, Project, ProjectStage, Task
+from ..models import (
+    Activity,
+    Location,
+    Opportunity,
+    OpportunityLine,
+    Project,
+    ProjectStage,
+    SalesOrder,
+    Task,
+)
 from ..schemas import (
-    OpportunityCreate,
-    OpportunityUpdate,
-    OpportunityOut,
-    OpportunityLineIn,
-    OpportunityLineOut,
     ActivityCreate,
     ActivityOut,
+    OpportunityCreate,
+    OpportunityLineIn,
+    OpportunityLineOut,
+    OpportunityOut,
+    OpportunityUpdate,
+    SalesOrderConfirmIn,
+    SalesOrderOut,
 )
+from ..services import stock as stock_svc
 
 ALLOWED_HERO_EXTS = {".png", ".jpg", ".jpeg"}
 MAX_HERO_BYTES = 8 * 1024 * 1024
@@ -248,3 +262,99 @@ def add_activity(opp_id: int, payload: ActivityCreate, db: Session = Depends(get
     db.commit()
     db.refresh(a)
     return a
+
+
+# ---------------- M4 — Confirm to Sales Order ----------------
+
+def _gen_so_ref(db: Session) -> str:
+    last = db.query(SalesOrder).order_by(SalesOrder.id.desc()).first()
+    return f"SO-{(last.id if last else 0) + 1:06d}"
+
+
+@router.post("/{opp_id}/confirm", response_model=SalesOrderOut)
+def confirm_to_sales_order(
+    opp_id: int,
+    payload: SalesOrderConfirmIn | None = None,
+    db: Session = Depends(get_db),
+):
+    """Promote an opportunity to a structured sales order.
+
+    Idempotent: if a SO already exists for this opp, returns it
+    unchanged. Otherwise creates the SO and reserves a `confirmed`
+    StockMove per mandatory line from the default internal location
+    into the first customer virtual location. Optional lines aren't
+    reserved (they're upsells, not committed scope).
+
+    If inventory isn't set up (no internal or no customer location),
+    the SO is still created — the reservation is just skipped. M3
+    can be turned on later and future SOs will reserve normally.
+    """
+    opp = db.get(Opportunity, opp_id)
+    if not opp:
+        raise HTTPException(404, "Opportunity not found")
+
+    existing = db.query(SalesOrder).filter(SalesOrder.opportunity_id == opp_id).first()
+    if existing:
+        return existing
+
+    payload = payload or SalesOrderConfirmIn()
+
+    so = SalesOrder(
+        ref=_gen_so_ref(db),
+        opportunity_id=opp.id,
+        state="confirmed",
+        currency="ZAR",
+        deposit_pct=float(opp.deposit_pct or 0.0),
+        notes=payload.notes or "",
+        confirmed_at=datetime.utcnow(),
+    )
+    db.add(so)
+    db.flush()  # need so.id for stock-move reference
+
+    # Resolve source/dest for the reservation. Caller can override; else
+    # we pick sensible defaults and skip if either side is missing.
+    src_loc = None
+    dst_loc = None
+    if payload.source_location_id is not None:
+        src_loc = db.get(Location, payload.source_location_id)
+    else:
+        src_loc = stock_svc.get_default_internal_location(db)
+    if payload.dest_location_id is not None:
+        dst_loc = db.get(Location, payload.dest_location_id)
+    else:
+        dst_loc = stock_svc.get_virtual_location(db, "customer")
+
+    if src_loc and dst_loc and src_loc.id != dst_loc.id:
+        for line in opp.lines:
+            if line.is_optional or not line.item_code:
+                # No item_id on OpportunityLine — line.item_code is a
+                # catalogue code string, not an FK. We need the Item id
+                # to attach to a StockMove. Resolve via the Item table.
+                pass
+            # Find the Item by code so we can reference it on the move.
+            # OpportunityLine intentionally doesn't FK to Item (the user
+            # may quote off-catalogue items), so this is a soft lookup.
+            from ..models import Item  # local import to avoid widening top-of-file
+            item = None
+            if line.item_code:
+                item = db.query(Item).filter(Item.code == line.item_code).first()
+            if not item or line.is_optional:
+                continue
+            qty = float(line.quantity or 0.0)
+            if qty <= 0:
+                continue
+            stock_svc.create_move(
+                db,
+                item_id=item.id,
+                qty=qty,
+                source_location_id=src_loc.id,
+                dest_location_id=dst_loc.id,
+                reference_kind="sales_order",
+                reference_id=so.id,
+                notes=f"Reservation for {so.ref} ({line.description or item.code})",
+                auto_confirm=True,
+            )
+
+    db.commit()
+    db.refresh(so)
+    return so

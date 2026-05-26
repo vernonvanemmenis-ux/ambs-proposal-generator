@@ -107,6 +107,30 @@ PAGE_BLOCKS: dict[str, dict[str, dict]] = {
             "default_enabled": True,
         },
     },
+    "sales_orders": {
+        "so_stats": {
+            "label": "SO stats row",
+            "description": "Counts and totals across the sales-order lifecycle (open commitment, invoiced YTD, paid YTD).",
+            "default_enabled": True,
+        },
+        "so_kanban": {
+            "label": "SO kanban",
+            "description": "Sales orders grouped by state (confirmed, delivered, invoiced, paid, cancelled).",
+            "default_enabled": True,
+        },
+    },
+    "invoices": {
+        "invoice_stats": {
+            "label": "Invoice stats row",
+            "description": "Outstanding total, overdue count, paid YTD.",
+            "default_enabled": True,
+        },
+        "invoice_list": {
+            "label": "Invoice list",
+            "description": "Searchable table of all invoices with state, totals, and outstanding balance.",
+            "default_enabled": True,
+        },
+    },
     "custom": {
         "heading": {
             "label": "Heading",
