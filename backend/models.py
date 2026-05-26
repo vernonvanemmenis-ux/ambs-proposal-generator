@@ -382,6 +382,85 @@ class Supplier(Base):
     )
 
 
+class PurchaseOrder(Base):
+    """M2 — outbound purchase order to a supplier.
+
+    Lifecycle: draft → confirmed → received → (optionally) cancelled.
+    M3 will wire `received` to actual stock moves; for now the receipt
+    only updates the per-line received_qty so we have a paper trail.
+    """
+    __tablename__ = "purchase_orders"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ref: Mapped[str] = mapped_column(String(40), default="")
+    supplier_id: Mapped[int] = mapped_column(ForeignKey("suppliers.id"))
+    status: Mapped[str] = mapped_column(String(20), default="draft")
+    expected_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    currency: Mapped[str] = mapped_column(String(8), default="ZAR")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    received_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    supplier: Mapped["Supplier"] = relationship()
+    lines: Mapped[list["PurchaseLine"]] = relationship(
+        back_populates="po",
+        cascade="all,delete",
+        order_by="PurchaseLine.sequence",
+    )
+    receipts: Mapped[list["Receipt"]] = relationship(
+        back_populates="po",
+        cascade="all,delete",
+        order_by="Receipt.received_at",
+    )
+
+    @property
+    def total(self) -> float:
+        return sum(ln.line_total for ln in self.lines)
+
+
+class PurchaseLine(Base):
+    """M2 — single line on a purchase order.
+
+    `received_qty` is the running total of what the supplier has actually
+    delivered (across one or more Receipts). M3 will replace the simple
+    counter with StockMove records, but the API shape stays the same.
+    """
+    __tablename__ = "purchase_lines"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    po_id: Mapped[int] = mapped_column(ForeignKey("purchase_orders.id"))
+    item_id: Mapped[int | None] = mapped_column(ForeignKey("items.id"), nullable=True)
+    sequence: Mapped[int] = mapped_column(Integer, default=0)
+    description: Mapped[str] = mapped_column(String(300), default="")
+    quantity: Mapped[float] = mapped_column(Float, default=1.0)
+    unit_of_measure: Mapped[str] = mapped_column(String(20), default="each")
+    unit_cost: Mapped[float] = mapped_column(Float, default=0.0)
+    received_qty: Mapped[float] = mapped_column(Float, default=0.0)
+    supplier_code: Mapped[str] = mapped_column(String(60), default="")
+
+    po: Mapped[PurchaseOrder] = relationship(back_populates="lines")
+
+    @property
+    def line_total(self) -> float:
+        return float(self.quantity or 0.0) * float(self.unit_cost or 0.0)
+
+
+class Receipt(Base):
+    """M2 — a single delivery event against a purchase order.
+
+    A PO can have multiple receipts if the supplier splits the delivery.
+    `lines_json` stores per-line received_qty for this event so the audit
+    trail survives a line being deleted from the PO later.
+    """
+    __tablename__ = "po_receipts"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    po_id: Mapped[int] = mapped_column(ForeignKey("purchase_orders.id"))
+    received_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    lines_json: Mapped[str] = mapped_column(Text, default="[]")
+
+    po: Mapped[PurchaseOrder] = relationship(back_populates="receipts")
+
+
 class ItemSupplier(Base):
     """M1 — many-to-many between Item and Supplier with per-link metadata.
 

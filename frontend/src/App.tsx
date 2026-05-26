@@ -14,6 +14,8 @@ import OpportunityTemplates from "./pages/OpportunityTemplates";
 import Salespeople from "./pages/Salespeople";
 import Sales from "./pages/Sales";
 import Suppliers from "./pages/Suppliers";
+import PurchaseOrders from "./pages/PurchaseOrders";
+import PurchaseOrderForm from "./pages/PurchaseOrderForm";
 import CustomPage from "./pages/CustomPage";
 
 export default function App() {
@@ -36,6 +38,8 @@ export default function App() {
           <Route path="/hr" element={<Salespeople />} />
           <Route path="/sales" element={<Sales />} />
           <Route path="/suppliers" element={<Suppliers />} />
+          <Route path="/purchase-orders" element={<PurchaseOrders />} />
+          <Route path="/purchase-orders/:id" element={<PurchaseOrderForm />} />
           <Route path="/p/:slug" element={<CustomPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
