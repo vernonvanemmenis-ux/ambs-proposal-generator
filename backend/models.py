@@ -382,6 +382,28 @@ class Supplier(Base):
     )
 
 
+class FxRate(Base):
+    """M6 — currency conversion rate.
+
+    Simple flat-table model: rate from one currency to another, with an
+    `effective_date` so historical rates can be kept for audit. The
+    converter looks up the latest active rate <= a given date.
+
+    Inverse rates (USD→ZAR vs ZAR→USD) are stored as separate rows;
+    no auto-inversion at read time, so the user can adjust each leg
+    independently if they want a buy/sell spread.
+    """
+    __tablename__ = "fx_rates"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    from_currency: Mapped[str] = mapped_column(String(8))
+    to_currency: Mapped[str] = mapped_column(String(8))
+    rate: Mapped[float] = mapped_column(Float, default=1.0)
+    effective_date: Mapped[date] = mapped_column(Date, default=date.today)
+    notes: Mapped[str] = mapped_column(Text, default="")
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class BoM(Base):
     """M5 — Bill of Materials.
 

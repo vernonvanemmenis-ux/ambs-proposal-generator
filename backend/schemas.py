@@ -405,6 +405,101 @@ class PageLayoutUpdate(BaseModel):
     blocks: list[PageLayoutBlock]
 
 
+# ---------------- M6 — Reports + Multi-currency ----------------
+class FxRateIn(BaseModel):
+    from_currency: str
+    to_currency: str
+    rate: float
+    effective_date: date | None = None
+    notes: str = ""
+    active: bool = True
+
+
+class FxRateOut(FxRateIn):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: datetime
+
+
+class InventoryValuationRow(BaseModel):
+    item_id: int
+    item_code: str
+    item_name: str
+    on_hand: float
+    unit_cost: float  # default_rate fallback when no PO cost yet
+    total_value: float
+
+
+class InventoryValuationOut(BaseModel):
+    rows: list[InventoryValuationRow] = []
+    total_value: float = 0.0
+    currency: str = "ZAR"
+
+
+class AgedReceivableBucket(BaseModel):
+    label: str        # current | 1-30 | 31-60 | 61-90 | 90+
+    count: int
+    total: float
+
+
+class AgedReceivableRow(BaseModel):
+    invoice_id: int
+    invoice_ref: str
+    sales_order_ref: str
+    client_name: str
+    due_date: date | None
+    days_overdue: int
+    total: float
+    paid: float
+    outstanding: float
+    bucket: str
+
+
+class AgedReceivablesOut(BaseModel):
+    rows: list[AgedReceivableRow] = []
+    buckets: list[AgedReceivableBucket] = []
+    grand_total: float = 0.0
+
+
+class SalesByStageRow(BaseModel):
+    stage: str
+    count: int
+    value: float
+
+
+class SalesBySalespersonRow(BaseModel):
+    salesperson: str
+    count: int
+    value: float
+
+
+class SalesMonthlyRow(BaseModel):
+    month: str  # YYYY-MM
+    count: int
+    value: float
+
+
+class SalesAnalyticsOut(BaseModel):
+    by_stage: list[SalesByStageRow] = []
+    by_salesperson: list[SalesBySalespersonRow] = []
+    monthly: list[SalesMonthlyRow] = []
+    pipeline_value: float = 0.0
+    won_value: float = 0.0
+    win_rate: float = 0.0
+
+
+class ManufacturingThroughputRow(BaseModel):
+    month: str
+    mo_count: int
+    units_produced: float
+
+
+class ManufacturingThroughputOut(BaseModel):
+    monthly: list[ManufacturingThroughputRow] = []
+    open_mo_count: int = 0
+    units_ytd: float = 0.0
+
+
 # ---------------- M5 — Manufacturing ----------------
 class WorkCenterIn(BaseModel):
     name: str

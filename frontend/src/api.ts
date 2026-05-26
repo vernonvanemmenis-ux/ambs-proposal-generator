@@ -318,6 +318,75 @@ export type ItemSupplier = {
 
 export type ItemSupplierDraft = Omit<ItemSupplier, "id">;
 
+// M6 — Reports + FX rates.
+export type FxRate = {
+  id: number;
+  from_currency: string;
+  to_currency: string;
+  rate: number;
+  effective_date: string | null;
+  notes: string;
+  active: boolean;
+  created_at: string;
+};
+
+export type InventoryValuationRow = {
+  item_id: number;
+  item_code: string;
+  item_name: string;
+  on_hand: number;
+  unit_cost: number;
+  total_value: number;
+};
+
+export type InventoryValuationReport = {
+  rows: InventoryValuationRow[];
+  total_value: number;
+  currency: string;
+};
+
+export type AgedReceivableBucket = { label: string; count: number; total: number };
+
+export type AgedReceivableRow = {
+  invoice_id: number;
+  invoice_ref: string;
+  sales_order_ref: string;
+  client_name: string;
+  due_date: string | null;
+  days_overdue: number;
+  total: number;
+  paid: number;
+  outstanding: number;
+  bucket: string;
+};
+
+export type AgedReceivablesReport = {
+  rows: AgedReceivableRow[];
+  buckets: AgedReceivableBucket[];
+  grand_total: number;
+};
+
+export type SalesByStageRow = { stage: string; count: number; value: number };
+export type SalesBySalespersonRow = { salesperson: string; count: number; value: number };
+export type SalesMonthlyRow = { month: string; count: number; value: number };
+
+export type SalesAnalyticsReport = {
+  by_stage: SalesByStageRow[];
+  by_salesperson: SalesBySalespersonRow[];
+  monthly: SalesMonthlyRow[];
+  pipeline_value: number;
+  won_value: number;
+  win_rate: number;
+};
+
+export type ManufacturingThroughputRow = { month: string; mo_count: number; units_produced: number };
+
+export type ManufacturingThroughputReport = {
+  monthly: ManufacturingThroughputRow[];
+  open_mo_count: number;
+  units_ytd: number;
+};
+
 // M5 — Manufacturing: BoMs, work centers, MOs, work orders, quality checks.
 export type WorkCenter = {
   id: number;
@@ -668,6 +737,36 @@ export const api = {
       }).then(j),
     delete: (id: number): Promise<{ ok: true }> =>
       fetch(`/api/tiles/${id}`, { method: "DELETE" }).then(j),
+  },
+  reports: {
+    inventoryValuation: (): Promise<InventoryValuationReport> =>
+      fetch("/api/reports/inventory-valuation").then(j),
+    agedReceivables: (): Promise<AgedReceivablesReport> =>
+      fetch("/api/reports/aged-receivables").then(j),
+    salesAnalytics: (): Promise<SalesAnalyticsReport> =>
+      fetch("/api/reports/sales-analytics").then(j),
+    manufacturingThroughput: (): Promise<ManufacturingThroughputReport> =>
+      fetch("/api/reports/manufacturing-throughput").then(j),
+    invoicesCsvUrl: (): string => "/api/reports/export/invoices.csv",
+    paymentsCsvUrl: (): string => "/api/reports/export/payments.csv",
+  },
+  fxRates: {
+    list: (includeInactive = false): Promise<FxRate[]> =>
+      fetch(`/api/fx-rates${includeInactive ? "?include_inactive=true" : ""}`).then(j),
+    create: (body: Partial<FxRate>): Promise<FxRate> =>
+      fetch("/api/fx-rates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    update: (id: number, body: Partial<FxRate>): Promise<FxRate> =>
+      fetch(`/api/fx-rates/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      }).then(j),
+    delete: (id: number): Promise<{ ok: true }> =>
+      fetch(`/api/fx-rates/${id}`, { method: "DELETE" }).then(j),
   },
   manufacturing: {
     workCenters: {

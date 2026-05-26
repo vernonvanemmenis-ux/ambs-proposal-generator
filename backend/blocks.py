@@ -157,6 +157,55 @@ PAGE_BLOCKS: dict[str, dict[str, dict]] = {
             "default_enabled": True,
         },
     },
+    "reports": {
+        "headline_kpis": {
+            "label": "Headline KPIs",
+            "description": "Top-of-page tiles: pipeline value, won YTD, outstanding AR, inventory value, units produced YTD.",
+            "default_enabled": True,
+        },
+        "sales_by_stage": {
+            "label": "Sales by stage",
+            "description": "Pie chart of pipeline value grouped by opportunity stage.",
+            "default_enabled": True,
+        },
+        "sales_by_salesperson": {
+            "label": "Sales by salesperson",
+            "description": "Bar chart of pipeline value per salesperson.",
+            "default_enabled": True,
+        },
+        "sales_monthly": {
+            "label": "Sales — monthly trend",
+            "description": "Line chart of opportunity-creation value by month.",
+            "default_enabled": True,
+        },
+        "aged_receivables": {
+            "label": "Aged receivables",
+            "description": "Outstanding invoices grouped into current / 1-30 / 31-60 / 61-90 / 90+ day buckets.",
+            "default_enabled": True,
+        },
+        "inventory_valuation": {
+            "label": "Inventory valuation",
+            "description": "Top items by stock value (on-hand × default rate) across all internal locations.",
+            "default_enabled": True,
+        },
+        "manufacturing_throughput": {
+            "label": "Manufacturing throughput",
+            "description": "MOs completed per month and units produced.",
+            "default_enabled": True,
+        },
+        "accounting_export": {
+            "label": "Accounting export",
+            "description": "CSV downloads of all invoices and all payments for handoff to the accountant.",
+            "default_enabled": True,
+        },
+    },
+    "fx_rates": {
+        "fx_rate_list": {
+            "label": "FX rate list",
+            "description": "Directional currency-pair conversion rates with effective dates.",
+            "default_enabled": True,
+        },
+    },
     "custom": {
         "heading": {
             "label": "Heading",
