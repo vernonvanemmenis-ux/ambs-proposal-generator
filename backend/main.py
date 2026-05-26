@@ -33,6 +33,7 @@ from .routers import (
     catalogue,
     clients,
     database,
+    fx_rates,
     inventory,
     invoices,
     items,
@@ -45,6 +46,7 @@ from .routers import (
     projects,
     proposals,
     purchase_orders,
+    reports,
     sales_orders,
     salespeople,
     status,
@@ -96,6 +98,8 @@ app.include_router(inventory.router)
 app.include_router(sales_orders.router)
 app.include_router(invoices.router)
 app.include_router(manufacturing.router)
+app.include_router(reports.router)
+app.include_router(fx_rates.router)
 app.include_router(opp_assets.router)
 app.include_router(ai_draft.router)
 app.include_router(layouts.router)
