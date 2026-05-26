@@ -23,6 +23,11 @@ import ReorderRulesPage from "./pages/ReorderRules";
 import SalesOrders from "./pages/SalesOrders";
 import SalesOrderForm from "./pages/SalesOrderForm";
 import Invoices from "./pages/Invoices";
+import ManufacturingOrders from "./pages/ManufacturingOrders";
+import ManufacturingOrderForm from "./pages/ManufacturingOrderForm";
+import BillsOfMaterials from "./pages/BillsOfMaterials";
+import BoMEditor from "./pages/BoMEditor";
+import WorkCenters from "./pages/WorkCenters";
 import CustomPage from "./pages/CustomPage";
 
 export default function App() {
@@ -54,6 +59,11 @@ export default function App() {
           <Route path="/sales-orders" element={<SalesOrders />} />
           <Route path="/sales-orders/:id" element={<SalesOrderForm />} />
           <Route path="/invoices" element={<Invoices />} />
+          <Route path="/manufacturing-orders" element={<ManufacturingOrders />} />
+          <Route path="/manufacturing-orders/:id" element={<ManufacturingOrderForm />} />
+          <Route path="/bills-of-materials" element={<BillsOfMaterials />} />
+          <Route path="/bills-of-materials/:id" element={<BoMEditor />} />
+          <Route path="/work-centers" element={<WorkCenters />} />
           <Route path="/p/:slug" element={<CustomPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
