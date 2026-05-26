@@ -405,6 +405,123 @@ class PageLayoutUpdate(BaseModel):
     blocks: list[PageLayoutBlock]
 
 
+# ---------------- M3 — Inventory ----------------
+class WarehouseIn(BaseModel):
+    name: str
+    code: str = ""
+    active: bool = True
+
+
+class WarehouseOut(WarehouseIn):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: datetime
+
+
+class LocationIn(BaseModel):
+    name: str
+    kind: str = "internal"  # internal | supplier | customer | production | scrap
+    warehouse_id: int | None = None
+    parent_id: int | None = None
+    active: bool = True
+
+
+class LocationOut(LocationIn):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: datetime
+
+
+class LotIn(BaseModel):
+    item_id: int
+    name: str
+    expiry_date: date | None = None
+    notes: str = ""
+
+
+class LotOut(LotIn):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: datetime
+
+
+class StockMoveIn(BaseModel):
+    item_id: int
+    qty: float
+    source_location_id: int
+    dest_location_id: int
+    lot_id: int | None = None
+    reference_kind: str = ""
+    reference_id: int | None = None
+    notes: str = ""
+
+
+class StockMoveOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    item_id: int
+    qty: float
+    source_location_id: int
+    dest_location_id: int
+    state: str
+    reference_kind: str
+    reference_id: int | None
+    lot_id: int | None
+    notes: str
+    created_at: datetime
+    done_at: datetime | None
+
+
+class QuantOut(BaseModel):
+    """On-hand stock by (item, location[, lot]). Computed from done moves."""
+    item_id: int
+    location_id: int
+    lot_id: int | None = None
+    qty: float
+
+
+class ReorderRuleIn(BaseModel):
+    item_id: int
+    location_id: int
+    min_qty: float = 0.0
+    max_qty: float = 0.0
+    qty_multiple: float = 1.0
+    active: bool = True
+
+
+class ReorderRuleOut(ReorderRuleIn):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    created_at: datetime
+
+
+class ReorderTriggerResult(BaseModel):
+    """What the trigger endpoint did.
+
+    `created_po_ids` lists draft POs the trigger spawned, grouped by
+    supplier. `skipped` reports rules that couldn't run (no item-supplier
+    link, no positive shortfall, etc.) with a reason string.
+    """
+    created_po_ids: list[int] = []
+    skipped: list[dict] = []
+
+
+class ScrapIn(BaseModel):
+    item_id: int
+    qty: float
+    source_location_id: int
+    reason: str = ""
+    lot_id: int | None = None
+
+
+class ScrapOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    stock_move_id: int
+    reason: str
+    created_at: datetime
+
+
 # ---------------- M2 — Purchase orders ----------------
 class PurchaseLineIn(BaseModel):
     item_id: int | None = None

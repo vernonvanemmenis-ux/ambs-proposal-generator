@@ -64,6 +64,49 @@ PAGE_BLOCKS: dict[str, dict[str, dict]] = {
             "default_enabled": True,
         },
     },
+    "inventory": {
+        "inventory_stats": {
+            "label": "Inventory stats row",
+            "description": "Counts of items, warehouses, internal locations, plus active stock-move backlog.",
+            "default_enabled": True,
+        },
+        "low_stock_alerts": {
+            "label": "Low-stock alerts",
+            "description": "Reorder rules where on-hand is below the min threshold, with a Trigger reorder button.",
+            "default_enabled": True,
+        },
+        "stock_grid": {
+            "label": "On-hand stock grid",
+            "description": "Computed quants by item and location from done stock moves.",
+            "default_enabled": True,
+        },
+        "recent_moves": {
+            "label": "Recent stock moves",
+            "description": "Last 25 stock-move events across all items and locations.",
+            "default_enabled": True,
+        },
+    },
+    "warehouses": {
+        "warehouse_list": {
+            "label": "Warehouses & locations",
+            "description": "Manage warehouses and their internal locations, plus virtual supplier/customer/scrap/production sinks.",
+            "default_enabled": True,
+        },
+    },
+    "stock_transfers": {
+        "transfer_kanban": {
+            "label": "Transfer kanban",
+            "description": "In-flight stock moves grouped by state (draft, confirmed, done, cancelled).",
+            "default_enabled": True,
+        },
+    },
+    "reorder_rules": {
+        "rule_list": {
+            "label": "Reorder rule list",
+            "description": "Per-item min/max thresholds at a location, plus a manual trigger that auto-creates draft POs.",
+            "default_enabled": True,
+        },
+    },
     "custom": {
         "heading": {
             "label": "Heading",

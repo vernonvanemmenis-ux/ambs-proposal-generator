@@ -16,6 +16,10 @@ import Sales from "./pages/Sales";
 import Suppliers from "./pages/Suppliers";
 import PurchaseOrders from "./pages/PurchaseOrders";
 import PurchaseOrderForm from "./pages/PurchaseOrderForm";
+import Inventory from "./pages/Inventory";
+import Warehouses from "./pages/Warehouses";
+import StockTransfers from "./pages/StockTransfers";
+import ReorderRulesPage from "./pages/ReorderRules";
 import CustomPage from "./pages/CustomPage";
 
 export default function App() {
@@ -40,6 +44,10 @@ export default function App() {
           <Route path="/suppliers" element={<Suppliers />} />
           <Route path="/purchase-orders" element={<PurchaseOrders />} />
           <Route path="/purchase-orders/:id" element={<PurchaseOrderForm />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/warehouses" element={<Warehouses />} />
+          <Route path="/stock-transfers" element={<StockTransfers />} />
+          <Route path="/reorder-rules" element={<ReorderRulesPage />} />
           <Route path="/p/:slug" element={<CustomPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>

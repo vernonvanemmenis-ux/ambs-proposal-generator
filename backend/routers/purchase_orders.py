@@ -30,6 +30,7 @@ from ..schemas import (
     ReceiptIn,
     ReceiptOut,
 )
+from ..services import stock as stock_svc
 
 
 router = APIRouter(prefix="/api/purchase-orders", tags=["purchase-orders"])
@@ -217,8 +218,37 @@ def receive_po(po_id: int, payload: ReceiptIn, db: Session = Depends(get_db)):
         deltas[rl.line_id] = rl.received_qty
 
     # Apply the deltas + persist the audit row.
+    # If inventory is wired up (M3+), each delta also spawns a done
+    # StockMove from the supplier virtual location into the default
+    # internal location so on-hand actually rises. We skip the move if
+    # the catalogue isn't ready (no supplier location, no internal
+    # location, or the line has no item_id) — the PO still receives.
+    supplier_loc = stock_svc.get_virtual_location(db, "supplier")
+    internal_loc = stock_svc.get_default_internal_location(db)
+    stock_warnings: list[str] = []
+
     for line_id, delta in deltas.items():
-        line_by_id[line_id].received_qty = float(line_by_id[line_id].received_qty) + float(delta)
+        line = line_by_id[line_id]
+        line.received_qty = float(line.received_qty) + float(delta)
+        if delta <= 0:
+            continue
+        if line.item_id and supplier_loc and internal_loc:
+            stock_svc.create_move(
+                db,
+                item_id=line.item_id,
+                qty=float(delta),
+                source_location_id=supplier_loc.id,
+                dest_location_id=internal_loc.id,
+                reference_kind="po_receipt",
+                reference_id=po.id,
+                notes=f"PO {po.ref} line {line_id}",
+                auto_done=True,
+            )
+        elif not (supplier_loc and internal_loc):
+            stock_warnings.append(
+                "inventory not configured — receipt recorded but stock unchanged",
+            )
+        # else: line has no item_id (free-text PO line), skip silently.
 
     receipt = Receipt(
         po_id=po.id,

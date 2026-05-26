@@ -33,6 +33,7 @@ from .routers import (
     catalogue,
     clients,
     database,
+    inventory,
     items,
     launcher_tiles,
     layouts,
@@ -88,6 +89,7 @@ app.include_router(opportunity_templates.router)
 app.include_router(salespeople.router)
 app.include_router(suppliers.router)
 app.include_router(purchase_orders.router)
+app.include_router(inventory.router)
 app.include_router(opp_assets.router)
 app.include_router(ai_draft.router)
 app.include_router(layouts.router)
