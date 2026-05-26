@@ -318,6 +318,116 @@ export type ItemSupplier = {
 
 export type ItemSupplierDraft = Omit<ItemSupplier, "id">;
 
+// M5 — Manufacturing: BoMs, work centers, MOs, work orders, quality checks.
+export type WorkCenter = {
+  id: number;
+  name: string;
+  code: string;
+  capacity_units_per_hour: number;
+  cost_per_hour: number;
+  calendar_json: string;
+  active: boolean;
+  notes: string;
+  created_at: string;
+};
+
+export type BoMLine = {
+  id: number;
+  item_id: number;
+  sequence: number;
+  qty_required: number;
+  unit_of_measure: string;
+  scrap_pct: number;
+};
+
+export type BoMOperation = {
+  id: number;
+  work_center_id: number;
+  name: string;
+  sequence: number;
+  duration_min: number;
+  notes: string;
+};
+
+export type BoM = {
+  id: number;
+  item_id: number;
+  code: string;
+  version: string;
+  qty_produced: number;
+  active: boolean;
+  notes: string;
+  created_at: string;
+  lines: BoMLine[];
+  operations: BoMOperation[];
+};
+
+export type BoMDraft = {
+  item_id: number;
+  code?: string;
+  version?: string;
+  qty_produced?: number;
+  active?: boolean;
+  notes?: string;
+  lines: Omit<BoMLine, "id">[];
+  operations: Omit<BoMOperation, "id">[];
+};
+
+export type WorkOrderState = "pending" | "in_progress" | "done" | "cancelled";
+
+export type WorkOrder = {
+  id: number;
+  mo_id: number;
+  operation_id: number | null;
+  work_center_id: number;
+  name: string;
+  sequence: number;
+  state: WorkOrderState;
+  operator: string;
+  started_at: string | null;
+  finished_at: string | null;
+  actual_duration_min: number;
+  notes: string;
+};
+
+export type QualityCheckKind = "pass_fail" | "measure" | "visual";
+export type QualityResult = "" | "pass" | "fail";
+
+export type QualityCheck = {
+  id: number;
+  mo_id: number;
+  work_order_id: number | null;
+  name: string;
+  kind: QualityCheckKind;
+  result: QualityResult;
+  measured_value: string;
+  notes: string;
+  performed_by: string;
+  performed_at: string | null;
+  created_at: string;
+};
+
+export type ManufacturingOrderState = "draft" | "confirmed" | "in_progress" | "done" | "cancelled";
+
+export type ManufacturingOrder = {
+  id: number;
+  ref: string;
+  bom_id: number;
+  qty_to_produce: number;
+  state: ManufacturingOrderState;
+  source_location_id: number | null;
+  dest_location_id: number | null;
+  notes: string;
+  scheduled_start: string | null;
+  confirmed_at: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  cancelled_at: string | null;
+  created_at: string;
+  work_orders: WorkOrder[];
+  quality_checks: QualityCheck[];
+};
+
 // M4 — Sales orders, invoices, payments.
 export type SalesOrderState = "confirmed" | "delivered" | "invoiced" | "paid" | "cancelled";
 export type InvoiceKind = "regular" | "down_payment";
@@ -558,6 +668,123 @@ export const api = {
       }).then(j),
     delete: (id: number): Promise<{ ok: true }> =>
       fetch(`/api/tiles/${id}`, { method: "DELETE" }).then(j),
+  },
+  manufacturing: {
+    workCenters: {
+      list: (includeInactive = false): Promise<WorkCenter[]> =>
+        fetch(`/api/manufacturing/work-centers${includeInactive ? "?include_inactive=true" : ""}`).then(j),
+      create: (body: Partial<WorkCenter>): Promise<WorkCenter> =>
+        fetch("/api/manufacturing/work-centers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      update: (id: number, body: Partial<WorkCenter>): Promise<WorkCenter> =>
+        fetch(`/api/manufacturing/work-centers/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      delete: (id: number): Promise<{ ok: true; soft_deleted: true }> =>
+        fetch(`/api/manufacturing/work-centers/${id}`, { method: "DELETE" }).then(j),
+    },
+    boms: {
+      list: (params: { item_id?: number; include_inactive?: boolean } = {}): Promise<BoM[]> => {
+        const qs = new URLSearchParams();
+        if (params.item_id != null) qs.set("item_id", String(params.item_id));
+        if (params.include_inactive) qs.set("include_inactive", "true");
+        const s = qs.toString();
+        return fetch(`/api/manufacturing/boms${s ? `?${s}` : ""}`).then(j);
+      },
+      get: (id: number): Promise<BoM> => fetch(`/api/manufacturing/boms/${id}`).then(j),
+      create: (body: BoMDraft): Promise<BoM> =>
+        fetch("/api/manufacturing/boms", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      update: (id: number, body: BoMDraft): Promise<BoM> =>
+        fetch(`/api/manufacturing/boms/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      delete: (id: number): Promise<{ ok: true; soft_deleted?: true }> =>
+        fetch(`/api/manufacturing/boms/${id}`, { method: "DELETE" }).then(j),
+    },
+    orders: {
+      list: (state?: ManufacturingOrderState): Promise<ManufacturingOrder[]> => {
+        const q = state ? `?state=${state}` : "";
+        return fetch(`/api/manufacturing/manufacturing-orders${q}`).then(j);
+      },
+      get: (id: number): Promise<ManufacturingOrder> =>
+        fetch(`/api/manufacturing/manufacturing-orders/${id}`).then(j),
+      create: (body: {
+        bom_id: number;
+        qty_to_produce: number;
+        source_location_id?: number | null;
+        dest_location_id?: number | null;
+        scheduled_start?: string | null;
+        notes?: string;
+      }): Promise<ManufacturingOrder> =>
+        fetch("/api/manufacturing/manufacturing-orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      update: (id: number, body: Partial<{
+        qty_to_produce: number;
+        source_location_id: number | null;
+        dest_location_id: number | null;
+        scheduled_start: string | null;
+        notes: string;
+      }>): Promise<ManufacturingOrder> =>
+        fetch(`/api/manufacturing/manufacturing-orders/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      delete: (id: number): Promise<{ ok: true }> =>
+        fetch(`/api/manufacturing/manufacturing-orders/${id}`, { method: "DELETE" }).then(j),
+      confirm: (id: number): Promise<ManufacturingOrder> =>
+        fetch(`/api/manufacturing/manufacturing-orders/${id}/confirm`, { method: "POST" }).then(j),
+      start: (id: number): Promise<ManufacturingOrder> =>
+        fetch(`/api/manufacturing/manufacturing-orders/${id}/start`, { method: "POST" }).then(j),
+      finish: (id: number): Promise<ManufacturingOrder> =>
+        fetch(`/api/manufacturing/manufacturing-orders/${id}/finish`, { method: "POST" }).then(j),
+      cancel: (id: number): Promise<ManufacturingOrder> =>
+        fetch(`/api/manufacturing/manufacturing-orders/${id}/cancel`, { method: "POST" }).then(j),
+    },
+    workOrders: {
+      update: (id: number, body: Partial<{ operator: string; notes: string; actual_duration_min: number }>): Promise<WorkOrder> =>
+        fetch(`/api/manufacturing/work-orders/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      start: (id: number): Promise<WorkOrder> =>
+        fetch(`/api/manufacturing/work-orders/${id}/start`, { method: "POST" }).then(j),
+      finish: (id: number): Promise<WorkOrder> =>
+        fetch(`/api/manufacturing/work-orders/${id}/finish`, { method: "POST" }).then(j),
+      cancel: (id: number): Promise<WorkOrder> =>
+        fetch(`/api/manufacturing/work-orders/${id}/cancel`, { method: "POST" }).then(j),
+    },
+    qc: {
+      create: (body: { mo_id: number; name: string; kind?: QualityCheckKind; work_order_id?: number | null; notes?: string }): Promise<QualityCheck> =>
+        fetch("/api/manufacturing/quality-checks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      update: (id: number, body: Partial<{ result: QualityResult; measured_value: string; notes: string; performed_by: string }>): Promise<QualityCheck> =>
+        fetch(`/api/manufacturing/quality-checks/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }).then(j),
+      delete: (id: number): Promise<{ ok: true }> =>
+        fetch(`/api/manufacturing/quality-checks/${id}`, { method: "DELETE" }).then(j),
+    },
   },
   salesOrders: {
     list: (state?: SalesOrderState): Promise<SalesOrder[]> => {
