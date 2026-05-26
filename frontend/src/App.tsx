@@ -28,6 +28,8 @@ import ManufacturingOrderForm from "./pages/ManufacturingOrderForm";
 import BillsOfMaterials from "./pages/BillsOfMaterials";
 import BoMEditor from "./pages/BoMEditor";
 import WorkCenters from "./pages/WorkCenters";
+import Reports from "./pages/Reports";
+import FxRates from "./pages/FxRates";
 import CustomPage from "./pages/CustomPage";
 
 export default function App() {
@@ -64,6 +66,8 @@ export default function App() {
           <Route path="/bills-of-materials" element={<BillsOfMaterials />} />
           <Route path="/bills-of-materials/:id" element={<BoMEditor />} />
           <Route path="/work-centers" element={<WorkCenters />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/fx-rates" element={<FxRates />} />
           <Route path="/p/:slug" element={<CustomPage />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
